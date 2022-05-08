@@ -1,0 +1,113 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
+
+buildscript {
+	dependencies {
+		classpath 'org.codehaus.groovy:groovy-all:3.0.9'
+	}
+}
+
+plugins {
+	id 'java-gradle-plugin'
+	id 'maven-publish'
+	id 'idea'
+	id 'com.github.johnrengelman.shadow' version '7.1.2'
+	id 'org.cadixdev.licenser' version '0.6.1' apply false
+}
+
+group = 'com.matyrobbrt.mc.registrationutils'
+
+configurations {
+	shade
+	implementation.extendsFrom(shade)
+}
+
+repositories {
+	maven { url = 'https://maven.minecraftforge.net/' }
+}
+
+dependencies {
+	shade 'net.minecraftforge:artifactural:3.0.8'
+}
+
+processResources {
+	from(createZipTask('Common', 'common', {
+		sourcePaths('licenseheader.txt')
+		action(spec -> spec.rename('licenseheader.txt', 'LICENSE'))
+	}))
+	from(createZipTask('Fabric', 'fabric'))
+	from(createZipTask('Forge', 'forge'))
+}
+
+def createZipTask(String proj, String outName, Closure<?>... extra) {
+	final var outPath = project.buildDir.toPath().resolve("projectszip").resolve("${outName}.zip")
+	final var task = tasks.create("${outName}Zip", Zip) {
+		from "${proj}/src/main/java"
+		from "${proj}/src/main/resources"
+		for (final Closure<?> clos : extra) {
+			final var conf = new ExtraConfiguration()
+			clos.delegate = conf
+			clos()
+			from(conf.sourcePaths, conf.action)
+		}
+		setDestinationDir(outPath.getParent().toFile())
+		archiveName("${outName}.zip")
+	}
+	tasks.getByName('processResources').dependsOn(task)
+	return outPath
+}
+
+class ExtraConfiguration {
+	Object[] sourcePaths
+	Action<? extends CopySpec> action = c -> {}
+
+	def sourcePaths(Object... sourcePaths) {
+		this.sourcePaths = sourcePaths
+	}
+	def action(Action<? extends CopySpec> action) {
+		this.action = action
+	}
+}
+
+gradlePlugin {
+	plugins {
+		registrationUtils {
+			id = 'com.matyrobbrt.mc.registrationutils'
+			implementationClass = 'com.matyrobbrt.registrationutils.gradle.RegistrationUtilsPlugin'
+		}
+	}
+}
+
+tasks.create('relocateShadowJar', ConfigureShadowRelocation) {
+	target(tasks.shadowJar)
+	prefix(project.getGroup() + "shade")
+}
+
+tasks.named('shadowJar', ShadowJar).configure {
+	archiveClassifier.set('')
+	configurations = [project.configurations.shade]
+	minimize()
+	dependsOn('relocateShadowJar')
+}
+
+publishing {
+	publications {
+		mavenJava(MavenPublication) {
+			artifacts {
+				archives shadowJar
+			}
+		}
+	}
+	repositories {
+		maven {
+			url "file://" + getProjectDir() + "\\maven"
+		}
+	}
+}
+
+allprojects {
+	apply plugin: 'org.cadixdev.licenser'
+	license {
+		header = rootProject.file('licenseheader.txt')
+	}
+}
