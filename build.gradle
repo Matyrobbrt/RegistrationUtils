@@ -10,6 +10,7 @@ buildscript {
 plugins {
 	id 'java-gradle-plugin'
 	id 'maven-publish'
+	id 'com.gradle.plugin-publish' version '0.18.0'
 	id 'idea'
 	id 'com.github.johnrengelman.shadow' version '7.1.2'
 	id 'org.cadixdev.licenser' version '0.6.1' apply false
@@ -69,11 +70,28 @@ class ExtraConfiguration {
 	}
 }
 
+pluginBundle {
+	website = 'https://github.com/Matyrobbrt/RegistrationUtils'
+	vcsUrl = 'https://github.com/Matyrobbrt/RegistrationUtils'
+	tags = ['minecraft', 'forge', 'fabric', 'multiloader']
+}
+
 gradlePlugin {
 	plugins {
 		registrationUtils {
 			id = 'com.matyrobbrt.mc.registrationutils'
+			displayName = 'RegistrationUtils'
+			description = 'A Minecraft modding plugin providing a library for easy multiloader registration.'
 			implementationClass = 'com.matyrobbrt.registrationutils.gradle.RegistrationUtilsPlugin'
+		}
+	}
+}
+
+publishing {
+	repositories {
+		maven {
+			name = 'localPluginRepository'
+			url = './maven'
 		}
 	}
 }
@@ -88,21 +106,6 @@ tasks.named('shadowJar', ShadowJar).configure {
 	configurations = [project.configurations.shade]
 	minimize()
 	dependsOn('relocateShadowJar')
-}
-
-publishing {
-	publications {
-		mavenJava(MavenPublication) {
-			artifacts {
-				archives shadowJar
-			}
-		}
-	}
-	repositories {
-		maven {
-			url "file://" + getProjectDir() + "\\maven"
-		}
-	}
 }
 
 allprojects {

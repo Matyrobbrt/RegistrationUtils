@@ -100,6 +100,10 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
             this.project = root.getObjects().property(Project.class).convention(root.findProject(name));
             configuration = root.getObjects().property(Configuration.class);
             runtimeConfiguration = root.getObjects().property(Configuration.class);
+
+            try {
+                type(name);
+            } catch (IllegalArgumentException ignored) {}
         }
 
         public void type(String type) {

@@ -3,6 +3,7 @@
 /bin/
 /logs/
 /data/
+/maven/
 
 #Hidden Directories
 .gradle/
