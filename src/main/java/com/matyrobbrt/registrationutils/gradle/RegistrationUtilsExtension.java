@@ -163,19 +163,19 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
         }
 
         public enum Type {
-            FABRIC(new MainClassHolderTransformer.LoadAllHolders("onInitialize()V")) {
+            FABRIC(new MainClassHolderTransformer.LoadAllHolders("onInitialize()V"), "modImplementation", "modImplementation") {
                 @Override
                 public String toString() {
                     return "fabric";
                 }
             },
-            FORGE(new MainClassHolderTransformer.LoadAllHolders("<init>()V")) {
+            FORGE(new MainClassHolderTransformer.LoadAllHolders("<init>()V"), "implementation", "runtimeOnly") {
                 @Override
                 public String toString() {
                     return "forge";
                 }
             },
-            COMMON(null) {
+            COMMON(null, "implementation", "runtimeOnly") {
                 @Override
                 public String toString() {
                     return "common";
@@ -183,9 +183,13 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
             };
 
             public final MainClassHolderTransformer mainClassHolderTransformer;
+            public final String configurationName;
+            public final String runtimeConfigurationName;
 
-            Type(MainClassHolderTransformer mainClassHolderTransformer) {
+            Type(MainClassHolderTransformer mainClassHolderTransformer, String configurationName, String runtimeConfigurationName) {
                 this.mainClassHolderTransformer = mainClassHolderTransformer;
+                this.configurationName = configurationName;
+                this.runtimeConfigurationName = runtimeConfigurationName;
             }
         }
     }

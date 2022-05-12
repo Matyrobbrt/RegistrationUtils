@@ -50,12 +50,12 @@ public class RegistrationUtilsPlugin implements Plugin<Project> {
                 ((ProjectInternal) proj).evaluate();
                 if (ext.addsDependencies()) {
                     final var type = sub.type.get();
-                    final var implConfiguration = proj.getConfigurations().findByName("implementation");
+                    final var implConfiguration = proj.getConfigurations().findByName(type.configurationName);
                     sub.configuration.getOrElse(Objects.requireNonNull(implConfiguration, "Default implementation configuration was not found! Consider setting a custom one!")).getDependencies()
                             .add(reg.common());
 
                     if (type != RegistrationUtilsExtension.SubProject.Type.COMMON) {
-                        final var runtimeConfiguration = proj.getConfigurations().findByName("runtimeOnly");
+                        final var runtimeConfiguration = proj.getConfigurations().findByName(type.runtimeConfigurationName);
                         sub.configuration.getOrElse(Objects.requireNonNull(runtimeConfiguration, "Default runtimeOnly configuration was not found! Consider setting a custom runtime configuration!")).getDependencies()
                                 .add(reg.loaderSpecific());
                     }

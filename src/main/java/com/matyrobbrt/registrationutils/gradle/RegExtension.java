@@ -115,7 +115,14 @@ public class RegExtension {
         typeSourcesIn = cachePath.resolve("sources").resolve(RegistrationUtilsPlugin.VERSION).resolve(type).toAbsolutePath();
 
         project.getPluginManager().apply(JavaPlugin.class);
-        project.getTasks().named(JavaPlugin.JAR_TASK_NAME, Jar.class, this::configureJarTask);
+        if (root.getExtensions().getByType(RegistrationUtilsExtension.class).addsDependencies()) {
+            project.getTasks().named(JavaPlugin.JAR_TASK_NAME, Jar.class, new Action<Jar>() {
+                @Override
+                public void execute(Jar jar) {
+                    configureJarTask(jar);
+                }
+            });
+        }
 
         if (config.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON && root.getExtensions().getByType(RegistrationUtilsExtension.class).transformsHolderLoading()) {
             // Can't use a lambda here, see: https://docs.gradle.org/7.4/userguide/validation_problems.html#implementation_unknown
