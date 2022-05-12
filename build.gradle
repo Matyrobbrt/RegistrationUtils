@@ -37,8 +37,9 @@ registrationUtils {
 
 group = 'com.matyrobbrt.mc.registrationutils'
 
-if (properties.containsKey("testing")) {
+if (properties.hasProperty("testing")) {
 	version = version + "-testing"
+	println "New version: $version"
 }
 
 configurations {
