@@ -5,8 +5,7 @@ RegistrationUtils is a Gradle plugin providing registration utilities for Minecr
 We all know that most people don't want to have a hard dependency on another mod, and since the utilities provided by this library consist in a few classes, it definitely isn't worth it to have a hard dependency.
 And as such, this library is provided in a Gradle plugin form, that installs the RegistrationUtils dependency, and shadows it at the same time in your mod jars.
 The steps that the plugin makes:
-- unpack and relocate the library
-- compile it locally
+- unpack and relocate the compiled library
 - add the library as a dependency to the subprojects (Common, Forge and Fabric)
 - make the `jar` task include the library in the final jar
 **Do not worry about licensing!** The library is MIT licensed, and the plugin makes sure that an original copy of the license is included in the final jar, so you're clear.
@@ -15,10 +14,10 @@ The steps that the plugin makes:
 To start, in your root `build.gradle`, add the following lines in order to install the plugin:
 ```groovy
 plugins {
-    id 'com.matyrobbrt.mc.registrationutils' // The plugin is located at the Gradle plugin central
+    id 'com.matyrobbrt.mc.registrationutils' // The plugin is located at the Gradle plugin portal
 }
 ```
-Next, we need to configure it. That is done in the `registrationutils` block.
+Next, we need to configure it. That is done in the `registrationUtils` block.
 We will first relocate the library group to our group:
 ```groovy
 group 'com.example.examplemod.registration' // Now the library is relocated to `com.example.examplemod.registration`

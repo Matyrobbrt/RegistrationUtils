@@ -28,6 +28,7 @@
 
 package com.matyrobbrt.registrationutils.gradle;
 
+import com.matyrobbrt.registrationutils.gradle.holderreg.MainClassHolderTransformer;
 import groovy.lang.Closure;
 import groovy.lang.GroovyObjectSupport;
 import org.gradle.api.NamedDomainObjectContainer;
@@ -40,13 +41,14 @@ import java.io.Serializable;
 import java.util.Locale;
 
 public class RegistrationUtilsExtension extends GroovyObjectSupport {
-    public static final String NAME = "registrationutils";
+    public static final String NAME = "registrationUtils";
 
     protected final Project project;
     protected final NamedDomainObjectContainer<SubProject> projects;
     protected boolean addDependencies = true;
     protected final Property<String> group;
     protected final Property<String> extensionName;
+    protected final Property<Boolean> transformHolderLoading;
 
     @Inject
     public RegistrationUtilsExtension(final Project project) {
@@ -54,6 +56,7 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
         this.projects = project.getObjects().domainObjectContainer(SubProject.class, n -> new SubProject(project, n));
         this.group = project.getObjects().property(String.class).convention(project.getGroup().toString());
         this.extensionName = project.getObjects().property(String.class).convention(RegExtension.NAME);
+        this.transformHolderLoading = project.getObjects().property(Boolean.class).convention(false);
     }
 
     public NamedDomainObjectContainer<SubProject> projects(@SuppressWarnings("rawtypes") Closure closure) {
@@ -71,8 +74,18 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
         addDependencies(true);
     }
 
+    public void transformHolderLoading(boolean transformHolderLoading) {
+        this.transformHolderLoading.set(transformHolderLoading);
+    }
+    public void transformHolderLoading() {
+        transformHolderLoading(true);
+    }
+
     public boolean addsDependencies() {
         return addDependencies;
+    }
+    public boolean transformsHolderLoading() {
+        return transformHolderLoading.get();
     }
 
     public void group(String group) {
@@ -91,6 +104,8 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
         public final Property<Configuration> configuration;
         public final Property<Configuration> runtimeConfiguration;
         final Property<Project> project;
+        public final Property<String> mainClass;
+        public final Property<String> modInitMethod;
 
         @Inject
         public SubProject(Project root, String name) {
@@ -100,6 +115,8 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
             this.project = root.getObjects().property(Project.class).convention(root.findProject(name));
             configuration = root.getObjects().property(Configuration.class);
             runtimeConfiguration = root.getObjects().property(Configuration.class);
+            mainClass = root.getObjects().property(String.class);
+            modInitMethod = root.getObjects().property(String.class).convention(MainClassHolderTransformer.COMPUTE_FLAG);
 
             try {
                 type(name);
@@ -122,10 +139,21 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
             this.runtimeConfiguration.set(configuration);
         }
 
-        public void project(String name) {
-            project.set(root.findProject(name));
+        public void mainClass(String mainClass) {
+            this.mainClass.set(mainClass);
         }
 
+        public void modInitMethod(String modInitMethod) {
+            this.modInitMethod.set(modInitMethod);
+        }
+
+        public void project(String name) {
+            if (name.toLowerCase(Locale.ROOT).equals("root")) {
+                project.set(root);
+            } else {
+                project.set(root.findProject(name));
+            }
+        }
         public void project(Project project) {
             this.project.set(project);
         }
@@ -135,24 +163,30 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
         }
 
         public enum Type {
-            FABRIC {
+            FABRIC(new MainClassHolderTransformer.LoadAllHolders("onInitialize()V")) {
                 @Override
                 public String toString() {
                     return "fabric";
                 }
             },
-            FORGE {
+            FORGE(new MainClassHolderTransformer.LoadAllHolders("<init>()V")) {
                 @Override
                 public String toString() {
                     return "forge";
                 }
             },
-            COMMON {
+            COMMON(null) {
                 @Override
                 public String toString() {
                     return "common";
                 }
             };
+
+            public final MainClassHolderTransformer mainClassHolderTransformer;
+
+            Type(MainClassHolderTransformer mainClassHolderTransformer) {
+                this.mainClassHolderTransformer = mainClassHolderTransformer;
+            }
         }
     }
 }

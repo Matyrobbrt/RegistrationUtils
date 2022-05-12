@@ -1,6 +1,10 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
 
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+
 buildscript {
 	dependencies {
 		classpath 'org.codehaus.groovy:groovy-all:3.0.9'
@@ -14,9 +18,28 @@ plugins {
 	id 'idea'
 	id 'com.github.johnrengelman.shadow' version '7.1.2'
 	id 'org.cadixdev.licenser' version '0.6.1' apply false
+	id 'com.matyrobbrt.mc.registrationutils' version '0.0.1'
+}
+
+registrationUtils {
+	// TODO testing should really be a separated project
+	group 'com.matyrobbrt.regutils.testing'
+	projects {
+		TestingProject {
+			type 'fabric'
+			project ':TestingProject'
+			mainClass 'com.matyrobbrt.regutils.testing.RegUtilsFabricTest'
+		}
+	}
+	transformHolderLoading true
+	addDependencies false
 }
 
 group = 'com.matyrobbrt.mc.registrationutils'
+
+if (properties.containsKey("testing")) {
+	version = version + "-testing"
+}
 
 configurations {
 	shade
@@ -24,25 +47,38 @@ configurations {
 }
 
 repositories {
-	maven { url = 'https://maven.minecraftforge.net/' }
+	maven { name = 'Forge'; url = 'https://maven.minecraftforge.net/' }
+	maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
+	maven { name = 'Sponge'; url = 'https://repo.spongepowered.org/repository/maven-public/' }
 }
 
 dependencies {
 	shade 'net.minecraftforge:artifactural:3.0.8'
+	shade 'org.ow2.asm:asm:9.3'
+	shade 'org.ow2.asm:asm-tree:9.3'
+	shade 'me.lucko:jar-relocator:1.5'
+
+//	compileOnly 'fabric-loom:fabric-loom.gradle.plugin:0.12.21'
+//	compileOnly 'org.spongepowered.gradle.plugin:org.spongepowered.gradle.plugin.gradle.plugin:2.0.2'
 }
 
-processResources {
-	from(createZipTask('Common', 'common', {
-		sourcePaths('licenseheader.txt')
-		action(spec -> spec.rename('licenseheader.txt', 'LICENSE'))
-	}))
-	from(createZipTask('Fabric', 'fabric'))
-	from(createZipTask('Forge', 'forge'))
-}
+this.subprojects({
+	afterEvaluate {
+		final var name = project.getName()
+		if (name == 'Common')
+			createAndAddZipTask(name, name.toLowerCase(Locale.ROOT), {
+				sourcePaths(rootProject.file('licenseheader.txt'))
+				action(spec -> spec.rename('licenseheader.txt', 'com/matyrobbrt/registrationutils/LICENSE'))
+			})
+		else if (name != 'TestingProject')
+			createAndAddZipTask(name, name.toLowerCase(Locale.ROOT))
+	}
+})
 
-def createZipTask(String proj, String outName, Closure<?>... extra) {
-	final var outPath = project.buildDir.toPath().resolve("projectszip").resolve("${outName}.zip")
-	final var task = tasks.create("${outName}Zip", Zip) {
+void createAndAddZipTask(String proj, String outName, Closure<?>... extra) {
+	final var task = (ProcessResources) tasks.getByName('processResources')
+	final var outPath = project.buildDir.toPath().resolve("projectszip").resolve("${outName}-sources.zip")
+	final var zip = tasks.create("${outName}Zip", Zip) {
 		from "${proj}/src/main/java"
 		from "${proj}/src/main/resources"
 		for (final Closure<?> clos : extra) {
@@ -52,10 +88,20 @@ def createZipTask(String proj, String outName, Closure<?>... extra) {
 			from(conf.sourcePaths, conf.action)
 		}
 		setDestinationDir(outPath.getParent().toFile())
-		archiveName("${outName}.zip")
+		archiveName("${outName}-sources.zip")
 	}
-	tasks.getByName('processResources').dependsOn(task)
-	return outPath
+	task.dependsOn(zip)
+	final var jarTask = project(":${proj}").tasks.named('jar', org.gradle.jvm.tasks.Jar).get();
+	for (final Closure<?> clos : extra) {
+		final var conf = new ExtraConfiguration()
+		clos.delegate = conf
+		clos()
+		jarTask.from(conf.sourcePaths, conf.action)
+	}
+	task.dependsOn(jarTask)
+	task.from(outPath)
+	final var out = List.copyOf(jarTask.getOutputs().getFiles().getFiles()).get(0);
+	task.from(out).rename(out.getName(), "${outName}.zip")
 }
 
 class ExtraConfiguration {
@@ -98,7 +144,7 @@ publishing {
 
 tasks.create('relocateShadowJar', ConfigureShadowRelocation) {
 	target(tasks.shadowJar)
-	prefix(project.getGroup() + "shade")
+	prefix("com.matyrobbrt.registrationutils.gradle.shade")
 }
 
 tasks.named('shadowJar', ShadowJar).configure {
@@ -106,6 +152,23 @@ tasks.named('shadowJar', ShadowJar).configure {
 	configurations = [project.configurations.shade]
 	minimize()
 	dependsOn('relocateShadowJar')
+	manifest.attributes(makeAttributes())
+}
+
+Map<?, ?> makeAttributes() {
+	final var actualDateTime = OffsetDateTime.now(ZoneOffset.UTC).withNano(0)
+	final var currentDateTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(actualDateTime)
+	return [
+		'Maven-Artifact'          : "${project.group}:${archivesBaseName}:${project.version}",
+		'Specification-Title'     : archivesBaseName,
+		'Specification-Vendor'    : 'Matyrobbrt',
+		'Specification-Version'   : '1',
+		'Implementation-Title'    : archivesBaseName,
+		'Implementation-Version'  : "${project.version}",
+		'Implementation-Vendor'   : 'Matyrobbrt',
+		'Implementation-Timestamp': currentDateTime,
+		'Built-On-Java'           : "${System.getProperty('java.vm.version')} (${System.getProperty('java.vm.vendor')})",
+	]
 }
 
 allprojects {

@@ -13,7 +13,14 @@ pluginManagement {
             url = uri("file://" + rootProject.projectDir + "\\maven")
         }
     }
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.toString() == 'com.matyrobbrt.mc.registrationutils') {
+                useModule("com.matyrobbrt.mc.registrationutils:registrationutils:" + requested.version + "-testing")
+            }
+        }
+    }
 }
 
 rootProject.name = "registrationutils"
-include ':Common', 'Forge', 'Fabric'
+include ':Common', 'Forge', 'Fabric', 'TestingProject'

@@ -28,15 +28,21 @@
 
 package com.matyrobbrt.registrationutils.gradle;
 
+import com.matyrobbrt.registrationutils.gradle.holderreg.HolderScanner;
 import com.matyrobbrt.registrationutils.gradle.task.RelocateResourceTask;
+import me.lucko.jarrelocator.JarRelocator;
+import me.lucko.jarrelocator.Relocation;
 import net.minecraftforge.artifactural.api.artifact.ArtifactIdentifier;
 import net.minecraftforge.artifactural.base.repository.ArtifactProviderBuilder;
 import net.minecraftforge.artifactural.base.repository.SimpleRepository;
 import net.minecraftforge.artifactural.gradle.GradleRepositoryAdapter;
+import org.gradle.api.Action;
 import org.gradle.api.Project;
+import org.gradle.api.Task;
 import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.java.archives.Manifest;
+import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.plugins.JavaPlugin;
+import org.gradle.api.tasks.AbstractCopyTask;
 import org.gradle.api.tasks.bundling.Jar;
 import org.gradle.plugins.ide.eclipse.model.Classpath;
 import org.gradle.plugins.ide.eclipse.model.EclipseModel;
@@ -44,26 +50,37 @@ import org.gradle.plugins.ide.eclipse.model.Library;
 import org.gradle.plugins.ide.idea.IdeaPlugin;
 import org.gradle.plugins.ide.idea.model.ModuleLibrary;
 import org.gradle.testfixtures.ProjectBuilder;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.ClassNode;
 
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
-import javax.tools.ToolProvider;
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
-import java.util.List;
+import java.util.Enumeration;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
+import java.util.regex.Pattern;
 
 public class RegExtension {
-
 
     public static final String NAME = "reg";
     public static final String JAR_NAME = "regutils";
@@ -74,14 +91,10 @@ public class RegExtension {
     private final Path cachePath;
     private final String group;
 
-    private final Path commonOut;
-    private final Path commonIn;
-    private final JarTask commonJar;
+    private final Path commonSourcesIn;
     private final JarTask commonSourcesJar;
 
-    private final Path typeOut;
-    private final Path typeIn;
-    private final JarTask typeJar;
+    private final Path typeSourcesIn;
     private final JarTask typeSourcesJar;
 
     public RegExtension(Project root, Project project, RegistrationUtilsExtension parent, RegistrationUtilsExtension.SubProject config) {
@@ -98,79 +111,66 @@ public class RegExtension {
         );
 
         final var type = config.type.get().toString();
-        commonIn = cachePath.resolve("compile").resolve("in").resolve(RegistrationUtilsPlugin.VERSION).resolve("common").toAbsolutePath();
-        commonOut = cachePath.resolve("compile").resolve("out").resolve(RegistrationUtilsPlugin.VERSION).resolve("common").toAbsolutePath();
-
-        typeIn = cachePath.resolve("compile").resolve("in").resolve(RegistrationUtilsPlugin.VERSION).resolve(type);
-        typeOut = cachePath.resolve("compile").resolve("out").resolve(RegistrationUtilsPlugin.VERSION).resolve(type);
+        commonSourcesIn = cachePath.resolve("sources").resolve(RegistrationUtilsPlugin.VERSION).resolve("common").toAbsolutePath();
+        typeSourcesIn = cachePath.resolve("sources").resolve(RegistrationUtilsPlugin.VERSION).resolve(type).toAbsolutePath();
 
         project.getPluginManager().apply(JavaPlugin.class);
-        project.getTasks().named(JavaPlugin.JAR_TASK_NAME, Jar.class, task -> {
-            task.doFirst(t -> common() /* Makes sure the utils jar exists */);
-            task.from(commonOut).exclude("META-INF/MANIFEST.MF");
-            if (config.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON) {
-                task.doFirst(t -> loaderSpecific());
-                task.from(typeOut).exclude("META-INF/MANIFEST.MF");
-            }
-        });
+        project.getTasks().named(JavaPlugin.JAR_TASK_NAME, Jar.class, this::configureJarTask);
 
-        final var internal = ProjectBuilder.builder()
+        if (config.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON && root.getExtensions().getByType(RegistrationUtilsExtension.class).transformsHolderLoading()) {
+            // Can't use a lambda here, see: https://docs.gradle.org/7.4/userguide/validation_problems.html#implementation_unknown
+            project.getTasks().named(JavaPlugin.CLASSES_TASK_NAME, t -> t.doLast(new Action<Task>() {
+                @Override
+                public void execute(Task task) {
+                    handleTransformation(project.getBuildDir().toPath().resolve("classes/java/main"));
+                }
+            }));
+        }
+        final var internal = (ProjectInternal) ProjectBuilder.builder()
                 .withName("reg_" + project.getName())
                 .withProjectDir(cachePath.resolve("projects").resolve(project.getName()).toFile())
                 .build();
 
-        this.commonJar = internal.getTasks().create("regCommonJar", JarTask.class, commonJar -> {
-            commonJar.from(commonOut);
-            commonJar.manifest(Manifest::getAttributes);
-            commonJar.getArchiveBaseName().set(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION);
-            commonJar.getDestinationDirectory().set(cachePath.toFile());
-        });
+        internal.evaluate();
+
         this.commonSourcesJar = internal.getTasks().create("regCommonSourcesJar", JarTask.class, task -> {
-            task.from(commonIn);
+            task.from(commonSourcesIn);
             task.getDestinationDirectory().set(cachePath.toFile());
             task.getArchiveBaseName().set(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION);
             task.getArchiveClassifier().set("sources");
         });
 
-        this.typeJar = internal.getTasks().create("regTypeJar", JarTask.class, task -> {
-            task.from(typeOut);
-            task.manifest(Manifest::getAttributes);
-            task.getArchiveBaseName().set(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION);
-            task.getArchiveClassifier().set(type);
-            task.getDestinationDirectory().set(cachePath.toFile());
-        });
         this.typeSourcesJar = internal.getTasks().create("regTypeSourcesJar", JarTask.class, task -> {
-            task.from(typeIn);
+            task.from(typeSourcesIn);
             task.getDestinationDirectory().set(cachePath.toFile());
-            task.getArchiveBaseName().set(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION);
-            task.getArchiveClassifier().set(type + "-sources");
+            task.getArchiveBaseName().set(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION + "-" + type);
+            task.getArchiveClassifier().set("sources");
         });
     }
 
+    public void configureJarTask(AbstractCopyTask task) {
+        task.from(project.zipTree(getJarPath(RegistrationUtilsExtension.SubProject.Type.COMMON, null))).exclude("META-INF/MANIFEST.MF");
+        if (config.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON) {
+            task.doFirst(t -> loaderSpecific());
+            task.from(project.zipTree(getJarPath(config.type.get(), null))).exclude("META-INF/MANIFEST.MF");
+        }
+    }
 
     @SuppressWarnings("ALL")
     public Dependency common() {
         final var dep = project.getDependencies().create(dependencyNotation(null));
-        maybeMakeCommonJar();
+        maybeCreateJar(null, commonSourcesIn, "common", "com.matyrobbrt.registrationutils", commonSourcesJar);
         return dep;
     }
 
-    // TODO: rename to type()
     @SuppressWarnings("ALL")
     public Dependency loaderSpecific() {
         final var type = config.type.get();
         if (type == RegistrationUtilsExtension.SubProject.Type.COMMON)
             return common();
         final var dep = project.getDependencies().create(dependencyNotation(type));
-
-        // We need the common classpath for this, so just so we can make sure it exists
-        final var commonPath = maybeMakeCommonJar().toAbsolutePath().toString();
-        maybeCreateJar(type, typeIn, typeOut, type + ".zip", typeJar, "com.matyrobbrt.registrationutils", typeSourcesJar, commonPath);
+        maybeCreateJar(type, typeSourcesIn, type.toString(), "com.matyrobbrt.registrationutils", typeSourcesJar);
         return dep;
-    }
-
-    private Path maybeMakeCommonJar() {
-        return maybeCreateJar(null, commonIn, commonOut, "common.zip", commonJar, "com.matyrobbrt.registrationutils", commonSourcesJar);
     }
 
     /**
@@ -179,16 +179,13 @@ public class RegExtension {
     @ParametersAreNonnullByDefault
     private Path maybeCreateJar(
             @Nullable RegistrationUtilsExtension.SubProject.Type type,
-            Path inPath,
-            Path outPath,
+            Path sourcesInPath,
             String resource,
-            JarTask jarTask,
             String inGroup,
-            @Nullable JarTask sourcesJarTask,
-            String... classpath
+            @Nullable JarTask sourcesJarTask
     ) {
         final var jarPath = getJarPath(type, null);
-        if (Files.exists(jarPath) && !project.hasProperty(FORCE_GENERATION_PROPERTY)) {
+        if (Files.exists(jarPath) && (!project.hasProperty(FORCE_GENERATION_PROPERTY) || project.getGradle().getStartParameter().isRefreshDependencies())) {
             attachSources(type);
             return jarPath;
         }
@@ -197,14 +194,14 @@ public class RegExtension {
         {
             // Start with relocating the jar
             try {
-                deleteDir(inPath);
+                deleteDir(sourcesInPath);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
             final var res = RelocateResourceTask.relocate(
                     project.getLogger(),
-                    RelocateResourceTask.getResourceDir(resource),
-                    inPath,
+                    RelocateResourceTask.getResourceDir(resource + "-sources.zip"),
+                    sourcesInPath,
                     inGroup,
                     group
             );
@@ -214,51 +211,60 @@ public class RegExtension {
         }
 
         {
-            // Next we compile it
-            final List<Path> allFiles = new ArrayList<>();
-            final List<File> directCopy = new ArrayList<>();
             try {
-                deleteDir(outPath);
-                Files.createDirectories(outPath);
-                Files.walkFileTree(inPath, new SimpleFileVisitor<>() {
-                    @Override
-                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        final var name = file.toString();
-                        if (name.endsWith(".java")) {
-                            allFiles.add(file.toAbsolutePath());
-                        } else {
-                            directCopy.add(file.toFile());
-                        }
-                        return super.visitFile(file, attrs);
-                    }
-                });
-                final var cp = new ArrayList<String>();
-                project.getConfigurations().getByName("minecraft").forEach(f -> cp.add(f.toString()));
-                cp.addAll(List.of(classpath));
-                final var compiler = ToolProvider.getSystemJavaCompiler();
-                final var fileManager = compiler.getStandardFileManager(null, Locale.ROOT, null);
-                final var fileObjs = fileManager.getJavaFileObjects(allFiles.toArray(Path[]::new));
-                compiler.getTask(null, fileManager, null, List.of(
-                        "-d", outPath.toString(), "-cp", String.join(";", cp.stream().toList())
-                ), null, fileObjs).call();
+                final String jarName = (type == null ? "common" : type.toString()) + "-" + RegistrationUtilsPlugin.VERSION + ".jar";
+                final var finishedTemp = cachePath.resolve("comp").resolve(jarName);
+                Files.createDirectories(finishedTemp.getParent());
+                Files.deleteIfExists(finishedTemp);
+                final var jar = cachePath.resolve("befcompiled").resolve(jarName);
+                Files.createDirectories(jar.getParent());
+                Files.deleteIfExists(jar);
+                Files.copy(Objects.requireNonNull(RegistrationUtilsExtension.class.getResourceAsStream("/" + resource + ".zip")), jar, StandardCopyOption.REPLACE_EXISTING);
+                final var relocator = new JarRelocator(jar.toFile(), finishedTemp.toFile(), Collections.singleton(new Relocation(inGroup, group)));
+                relocator.run();
 
-                for (final var dC : directCopy) {
-                    final var dir = outPath.resolve(inPath.relativize(dC.toPath().getParent()));
-                    Files.createDirectories(dir);
-                    Files.copy(dC.toPath(), dir.resolve(dC.getName()));
+                final var groupPattern = Pattern.compile(inGroup.replace(".", "\\."));
+
+                // Now we gotta rename META-INFs
+                try (JarOutputStream out = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(jarPath.toFile())))) {
+                    try (JarFile in = new JarFile(finishedTemp.toFile())) {
+                        for (Enumeration<JarEntry> entries = in.entries(); entries.hasMoreElements(); ) {
+                            final var entry = entries.nextElement();
+
+                            final var name = entry.getName();
+                            final var is = in.getInputStream(entry);
+                            if (!name.startsWith("META-INF/services/") || entry.isDirectory()) {
+                                out.putNextEntry(entry);
+                                is.transferTo(out);
+                                out.closeEntry();
+                                continue;
+                            }
+
+                            var serviceName = name.substring(18);
+                            final var nameMatcher = groupPattern.matcher(serviceName);
+                            if (!nameMatcher.find()) {
+                                out.putNextEntry(entry);
+                                is.transferTo(out);
+                                out.closeEntry();
+                                continue;
+                            }
+                            serviceName = nameMatcher.replaceAll(group);
+                            var content = RelocateResourceTask.readBytes(is).toString();
+                            content = groupPattern.matcher(content).replaceAll(group);
+
+                            final var newEntry = new JarEntry("META-INF/services/" + serviceName);
+                            out.putNextEntry(newEntry);
+                            out.write(content.getBytes(StandardCharsets.UTF_8));
+                            out.closeEntry();
+                        }
+                    }
                 }
             } catch (IOException e) {
-                throw new RuntimeException("Exception occurred copying regutils files for compilation!", e, false, true) {};
+                throw new RuntimeException(e);
             }
         }
 
         {
-            // Now let's package it back
-            // Compiled
-            jarTask.makeJar((e) -> {
-                throw new RuntimeException(e);
-            });
-
             // Sources
             if (sourcesJarTask != null) {
                 sourcesJarTask.copy();
@@ -310,6 +316,49 @@ public class RegExtension {
             return cachePath.resolve(appendClassifier(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION, classifier) + ".jar");
         } else {
             return cachePath.resolve(appendClassifier(appendClassifier(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION, type.name().toLowerCase(Locale.ROOT)), classifier) + ".jar");
+        }
+    }
+
+    private void handleTransformation(Path classesOut) {
+        final var mainClassName = config.mainClass.get();
+        final var mainClassP = mainClassName.replace('.', '/') + ".class";
+        final var mainClassOut = classesOut.resolve(mainClassP).toAbsolutePath();
+        final var scanner = new HolderScanner(project.getLogger(), group);
+        try {
+            Files.walkFileTree(classesOut, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    file = file.toAbsolutePath();
+                    if (mainClassOut.equals(file)) {
+                        return FileVisitResult.CONTINUE;
+                    } else if (file.toString().endsWith(".class")) {
+                        scanner.processClass(file);
+                    }
+                    return super.visitFile(file, attrs);
+                }
+            });
+
+            // Let's add stuff to meta-inf
+            final var servicesFile = classesOut.resolve("META-INF/services/" + (group.length() < 1 ? "" : group + ".") + "RegistryHolder");
+            Files.deleteIfExists(servicesFile);
+            Files.createDirectories(servicesFile.getParent());
+            Files.write(servicesFile.toAbsolutePath(), scanner.getFoundClasses());
+
+            // Now, we need to transform the main class
+            if (!Files.exists(mainClassOut)) {
+                throw new RuntimeException("Could not find main class " + mainClassName);
+            }
+            final var cr = new ClassReader(Files.readAllBytes(mainClassOut));
+            final ClassNode clazz = new ClassNode(Opcodes.ASM9);
+            cr.accept(clazz, 0);
+            if (config.type.get().mainClassHolderTransformer.transform(clazz, config.modInitMethod.get(), group)) {
+                final var cw = new ClassWriter(Opcodes.ASM9);
+                clazz.accept(cw);
+                project.getLogger().trace("Transforming main mod class {}: adding registry class static init in mod initialization", clazz.name);
+                Files.write(mainClassOut, cw.toByteArray());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 

@@ -30,21 +30,24 @@ package com.matyrobbrt.registrationutils.gradle;
 
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
+import org.gradle.api.internal.project.ProjectInternal;
 
 import java.util.Objects;
 
 public class RegistrationUtilsPlugin implements Plugin<Project> {
 
-    public static final String VERSION = "1.0";
+    public static final String VERSION = RegistrationUtilsPlugin.class.getPackage().getImplementationVersion();
     public static final String CACHE_FOLDER = "registrationutils";
 
     @Override
     public void apply(Project project) {
         final var ext = project.getExtensions().create(RegistrationUtilsExtension.NAME, RegistrationUtilsExtension.class, project);
-        project.afterEvaluate($ -> {
+        project.afterEvaluate($$ -> {
             ext.getProjects().forEach(sub -> {
                 final var proj = sub.project.get();
-                final var reg = sub.project.get().getExtensions().create(ext.extensionName.get(), RegExtension.class, project, proj, ext, sub);
+                final var reg = proj.getExtensions().create(ext.extensionName.get(), RegExtension.class, project, proj, ext, sub);
+                // Force project evaluation
+                ((ProjectInternal) proj).evaluate();
                 if (ext.addsDependencies()) {
                     final var type = sub.type.get();
                     final var implConfiguration = proj.getConfigurations().findByName("implementation");
@@ -59,5 +62,6 @@ public class RegistrationUtilsPlugin implements Plugin<Project> {
                 }
             });
         });
+        ((ProjectInternal) project).evaluate(); // We need to force project evaluation
     }
 }

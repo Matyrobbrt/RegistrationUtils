@@ -35,17 +35,24 @@ import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.TaskAction;
 import org.slf4j.Logger;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 public abstract class RelocateResourceTask extends DefaultTask implements Runnable {
 
@@ -76,12 +83,17 @@ public abstract class RelocateResourceTask extends DefaultTask implements Runnab
                 final var fileData = FileData.create(name);
                 final var relocatedName = regex.matcher(fileData.fileName()).replaceAll(toGroup);
                 final var pkg = fileData.directory().replace('/', '.');
-                final var path = output.resolve(fileData.directory().isEmpty() ? relocatedName : regex.matcher(pkg).replaceAll(toGroup).replace('.', '/') + "/" + relocatedName);
+                var path = output.resolve(fileData.directory().isEmpty() ? relocatedName : regex.matcher(pkg).replaceAll(toGroup).replace('.', '/') + "/" + relocatedName);
                 if (path.getParent() != null) {
                     Files.createDirectories(path.getParent());
                 }
                 Files.deleteIfExists(path);
-                Files.writeString(path, extraReplaceFunction.apply(regex.matcher(data).replaceAll(toGroup), fileData), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+                if (fileData.fileName().endsWith(".class")) { // Don't process class files
+                    path = output.resolve(name);
+                    Files.copy(new ByteArrayInputStream(data.toByteArray()), path, StandardCopyOption.REPLACE_EXISTING);
+                } else {
+                    Files.writeString(path, extraReplaceFunction.apply(regex.matcher(data.toString()).replaceAll(toGroup), fileData), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+                }
             });
         } catch (IOException e) {
             logger.error("Exception trying to relocate resource: ", e);
@@ -90,19 +102,41 @@ public abstract class RelocateResourceTask extends DefaultTask implements Runnab
         return true;
     }
 
-    public static <X extends Exception> void forEachEntry(ZipInputStream stream, ThrowingBiConsumer<String, String, X> action) throws X, IOException {
+    public static byte[] filesZip(Path directory) throws IOException {
+        final var bo = new ByteArrayOutputStream();
+        final var zipOut = new ZipOutputStream(bo);
+        Files.walkFileTree(directory, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                final var zipEntry = new ZipEntry(directory.relativize(file).toString());
+                zipOut.putNextEntry(zipEntry);
+                zipOut.write(Files.readAllBytes(file));
+                zipOut.closeEntry();
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        zipOut.close();
+        return bo.toByteArray();
+    }
+
+    public static <X extends Exception> void forEachEntry(ZipInputStream stream, ThrowingBiConsumer<String, ByteArrayOutputStream, X> action) throws X, IOException {
         ZipEntry entry;
         while ((entry = stream.getNextEntry()) != null) {
             if (!entry.isDirectory()) {
-                try (final var bos = new ByteArrayOutputStream()) {
-                    int len;
-                    while ((len = stream.read()) > 0) {
-                        bos.write(len);
-                    }
-                    action.accept(entry.getName(), bos.toString());
+                try (final var bos = readBytes(stream)) {
+                    action.accept(entry.getName(), bos);
                 }
             }
         }
+    }
+
+    public static ByteArrayOutputStream readBytes(InputStream stream) throws IOException {
+        final var bos = new ByteArrayOutputStream();
+        int len;
+        while ((len = stream.read()) > 0) {
+            bos.write(len);
+        }
+        return bos;
     }
 
     public interface ThrowingBiConsumer<A, B, X extends Exception> {
