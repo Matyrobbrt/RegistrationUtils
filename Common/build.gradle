@@ -6,3 +6,11 @@ plugins {
 minecraft {
     version(minecraft_version)
 }
+
+jar {
+    manifest {
+        attributes([
+                'FMLModType': 'GAMELIBRARY'
+        ])
+    }
+}

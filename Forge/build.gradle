@@ -20,3 +20,11 @@ dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     compileOnly project(":Common")
 }
+
+jar {
+    manifest {
+        attributes([
+            'FMLModType': 'GAMELIBRARY'
+        ])
+    }
+}

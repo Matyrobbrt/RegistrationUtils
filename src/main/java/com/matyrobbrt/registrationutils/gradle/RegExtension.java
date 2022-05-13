@@ -192,7 +192,7 @@ public class RegExtension {
             @Nullable JarTask sourcesJarTask
     ) {
         final var jarPath = getJarPath(type, null);
-        if (Files.exists(jarPath) && (!project.hasProperty(FORCE_GENERATION_PROPERTY) || project.getGradle().getStartParameter().isRefreshDependencies())) {
+        if (Files.exists(jarPath) && !(project.hasProperty(FORCE_GENERATION_PROPERTY) || project.getGradle().getStartParameter().isRefreshDependencies())) {
             attachSources(type);
             return jarPath;
         }
