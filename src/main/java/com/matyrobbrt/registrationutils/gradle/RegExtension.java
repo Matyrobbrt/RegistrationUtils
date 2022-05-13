@@ -369,9 +369,9 @@ public class RegExtension {
 
     public Path getJarPath(RegistrationUtilsExtension.SubProject.Type type, String classifier) {
         if (type == null || type == RegistrationUtilsExtension.SubProject.Type.COMMON) {
-            return cachePath.resolve(appendClassifier(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION, classifier) + ".jar");
+            return cachePath.resolve(appendClassifier(JAR_NAME, classifier) + "-" + RegistrationUtilsPlugin.VERSION + ".jar");
         } else {
-            return cachePath.resolve(appendClassifier(JAR_NAME + "-" + type + "-" + RegistrationUtilsPlugin.VERSION, classifier) + ".jar");
+            return cachePath.resolve(appendClassifier(JAR_NAME + "-" + type, classifier) + "-" + RegistrationUtilsPlugin.VERSION + ".jar");
         }
     }
 
