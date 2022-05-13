@@ -30,9 +30,7 @@ package com.matyrobbrt.registrationutils.gradle;
 
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
-import org.gradle.api.internal.project.ProjectInternal;
-
-import java.util.Objects;
+import org.gradle.api.plugins.JavaPlugin;
 
 public class RegistrationUtilsPlugin implements Plugin<Project> {
 
@@ -46,22 +44,25 @@ public class RegistrationUtilsPlugin implements Plugin<Project> {
             ext.getProjects().forEach(sub -> {
                 final var proj = sub.project.get();
                 final var reg = proj.getExtensions().create(ext.extensionName.get(), RegExtension.class, project, proj, ext, sub);
-                // Force project evaluation
-                ((ProjectInternal) proj).evaluate();
                 if (ext.addsDependencies()) {
-                    final var type = sub.type.get();
-                    final var implConfiguration = proj.getConfigurations().findByName(type.configurationName);
-                    sub.configuration.getOrElse(Objects.requireNonNull(implConfiguration, "Default implementation configuration was not found! Consider setting a custom one!")).getDependencies()
-                            .add(reg.common());
+                    final var compConfig = proj.getConfigurations().findByName(JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME);
+                    if (compConfig != null) {
+                        compConfig.getDependencies().add(reg.common());
+                    }
 
-                    if (type != RegistrationUtilsExtension.SubProject.Type.COMMON) {
-                        final var runtimeConfiguration = proj.getConfigurations().findByName(type.runtimeConfigurationName);
-                        sub.configuration.getOrElse(Objects.requireNonNull(runtimeConfiguration, "Default runtimeOnly configuration was not found! Consider setting a custom runtime configuration!")).getDependencies()
-                                .add(reg.loaderSpecific());
+                    final var testCompConfig = proj.getConfigurations().findByName(JavaPlugin.TEST_COMPILE_ONLY_CONFIGURATION_NAME);
+                    if (testCompConfig != null) {
+                        testCompConfig.getDependencies().add(reg.common());
+                    }
+
+                    if (sub.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON) {
+                        final var runtimeConfiguration = proj.getConfigurations().findByName(JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME);
+                        if (runtimeConfiguration != null) {
+                            runtimeConfiguration.getDependencies().add(reg.joined());
+                        }
                     }
                 }
             });
         });
-        ((ProjectInternal) project).evaluate(); // We need to force project evaluation
     }
 }

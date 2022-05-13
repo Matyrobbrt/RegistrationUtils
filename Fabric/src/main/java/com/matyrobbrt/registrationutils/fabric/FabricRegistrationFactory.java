@@ -26,8 +26,10 @@
  * SOFTWARE.
  */
 
-package com.matyrobbrt.registrationutils;
+package com.matyrobbrt.registrationutils.fabric;
 
+import com.matyrobbrt.registrationutils.RegistrationProvider;
+import com.matyrobbrt.registrationutils.RegistryObject;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;

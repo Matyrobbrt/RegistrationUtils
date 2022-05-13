@@ -16,7 +16,7 @@ pluginManagement {
     resolutionStrategy {
         eachPlugin {
             if (requested.id.toString() == 'com.matyrobbrt.mc.registrationutils') {
-                useModule("com.matyrobbrt.mc.registrationutils:registrationutils:" + requested.version + "-testing")
+                useModule("com.matyrobbrt.mc.registrationutils:registrationutils:" + requested.version)
             }
         }
     }

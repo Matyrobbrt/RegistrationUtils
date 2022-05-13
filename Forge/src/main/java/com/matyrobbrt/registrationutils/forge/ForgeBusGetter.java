@@ -26,7 +26,7 @@
  * SOFTWARE.
  */
 
-package com.matyrobbrt.registrationutils;
+package com.matyrobbrt.registrationutils.forge;
 
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModContainer;

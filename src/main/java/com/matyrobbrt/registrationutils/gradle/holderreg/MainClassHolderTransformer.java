@@ -33,6 +33,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 
 import java.util.Locale;
+import java.util.stream.StreamSupport;
 
 // TODO this could be done such way that there could be multiple transformers
 public interface MainClassHolderTransformer {
@@ -59,7 +60,16 @@ public interface MainClassHolderTransformer {
                         }
                     })
                     .map(mthd -> {
-                        mthd.instructions.insert(new MethodInsnNode(Opcodes.INVOKESTATIC, type, LOAD_ALL_METHOD_NAME, LOAD_ALL_METHOD_DESC, true));
+                        final var newInsn = new MethodInsnNode(Opcodes.INVOKESTATIC, type, LOAD_ALL_METHOD_NAME, LOAD_ALL_METHOD_DESC, true);
+                        // Basically this entire filter is to make sure `super()` methods are called before `loadAll`
+                        StreamSupport.stream(mthd.instructions.spliterator(), false)
+                            .filter(i -> i.getOpcode() == Opcodes.INVOKESPECIAL)
+                            .filter(MethodInsnNode.class::isInstance)
+                            .map(MethodInsnNode.class::cast)
+                            .filter(i -> i.owner.equals(clazz.superName))
+                            .filter(i -> i.name.equals("<init>"))
+                            .findFirst()
+                            .ifPresentOrElse(superInsn -> mthd.instructions.insert(superInsn, newInsn), () -> mthd.instructions.insert(newInsn));
                         return true;
                     })
                     .findFirst()

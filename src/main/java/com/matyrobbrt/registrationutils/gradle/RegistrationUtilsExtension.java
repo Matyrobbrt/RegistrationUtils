@@ -33,7 +33,6 @@ import groovy.lang.Closure;
 import groovy.lang.GroovyObjectSupport;
 import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.Project;
-import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.provider.Property;
 
 import javax.inject.Inject;
@@ -101,8 +100,6 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
         private final Project root;
 
         public final Property<Type> type;
-        public final Property<Configuration> configuration;
-        public final Property<Configuration> runtimeConfiguration;
         final Property<Project> project;
         public final Property<String> mainClass;
         public final Property<String> modInitMethod;
@@ -113,8 +110,6 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
             this.root = root;
             this.type = root.getObjects().property(Type.class).convention(Type.COMMON);
             this.project = root.getObjects().property(Project.class).convention(root.findProject(name));
-            configuration = root.getObjects().property(Configuration.class);
-            runtimeConfiguration = root.getObjects().property(Configuration.class);
             mainClass = root.getObjects().property(String.class);
             modInitMethod = root.getObjects().property(String.class).convention(MainClassHolderTransformer.COMPUTE_FLAG);
 
@@ -130,13 +125,6 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
                 case "common" -> Type.COMMON;
                 default -> throw new IllegalArgumentException("Unknown project type " + type);
             });
-        }
-
-        public void configuration(Configuration configuration) {
-            this.configuration.set(configuration);
-        }
-        public void runtimeConfiguration(Configuration configuration) {
-            this.runtimeConfiguration.set(configuration);
         }
 
         public void mainClass(String mainClass) {
@@ -163,19 +151,19 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
         }
 
         public enum Type {
-            FABRIC(new MainClassHolderTransformer.LoadAllHolders("onInitialize()V"), "modImplementation", "modImplementation") {
+            FABRIC(new MainClassHolderTransformer.LoadAllHolders("onInitialize()V")) {
                 @Override
                 public String toString() {
                     return "fabric";
                 }
             },
-            FORGE(new MainClassHolderTransformer.LoadAllHolders("<init>()V"), "implementation", "runtimeOnly") {
+            FORGE(new MainClassHolderTransformer.LoadAllHolders("<init>()V")) {
                 @Override
                 public String toString() {
                     return "forge";
                 }
             },
-            COMMON(null, "implementation", "runtimeOnly") {
+            COMMON(null) {
                 @Override
                 public String toString() {
                     return "common";
@@ -183,13 +171,9 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
             };
 
             public final MainClassHolderTransformer mainClassHolderTransformer;
-            public final String configurationName;
-            public final String runtimeConfigurationName;
 
-            Type(MainClassHolderTransformer mainClassHolderTransformer, String configurationName, String runtimeConfigurationName) {
+            Type(MainClassHolderTransformer mainClassHolderTransformer) {
                 this.mainClassHolderTransformer = mainClassHolderTransformer;
-                this.configurationName = configurationName;
-                this.runtimeConfigurationName = runtimeConfigurationName;
             }
         }
     }

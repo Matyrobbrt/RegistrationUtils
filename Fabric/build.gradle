@@ -16,3 +16,12 @@ dependencies {
 processResources {
     from project(":Common").sourceSets.main.resources
 }
+
+jar {
+    rename 'dummy_fabric.mod.json', 'fabric.mod.json'
+    inputs.property "version", project.version
+
+    filesMatching('*.mod.json') {
+        expand('type': 'regutils-fabric', 'version': project.version)
+    }
+}

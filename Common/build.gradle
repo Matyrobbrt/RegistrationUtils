@@ -13,4 +13,10 @@ jar {
                 'FMLModType': 'GAMELIBRARY'
         ])
     }
+    rename 'dummy_fabric.mod.json', 'fabric.mod.json'
+    inputs.property "version", project.version
+
+    filesMatching('*.mod.json') {
+        expand('type': 'regutils-common', 'version': project.version)
+    }
 }

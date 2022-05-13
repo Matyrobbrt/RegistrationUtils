@@ -41,14 +41,17 @@ public record RegArtifactProvider(String group, Path dir) implements ArtifactPro
 
     @Override
     public Artifact getArtifact(ArtifactIdentifier info) {
-        if (!info.getGroup().equals(group))
+        if (!info.getGroup().equals(group)) {
+            // System.out.println("Requested " + info + " could not provide...");
             return Artifact.none(); // We only want ours
+        }
         final Path file;
         if (info.getClassifier() == null) {
             file = dir.resolve(info.getName() + "-" + info.getVersion() + "." + info.getExtension());
         } else {
             file = dir.resolve(info.getName() + "-" + info.getVersion() + "-" + info.getClassifier() + "." + info.getExtension());
         }
+        // System.out.println("Requested " + info + " at " + file);
         if (!Files.exists(file)) {
             return Artifact.none();
         }

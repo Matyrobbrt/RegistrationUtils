@@ -71,7 +71,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
@@ -85,6 +84,11 @@ public class RegExtension {
     public static final String NAME = "reg";
     public static final String JAR_NAME = "regutils";
     public static final String FORCE_GENERATION_PROPERTY = "regForceGeneration";
+
+    public static final String[] EXCLUDE_FILES = {
+        "META-INF/MANIFEST.MF",
+        "fabric.mod.json"
+    };
 
     private final Project project;
     private final RegistrationUtilsExtension.SubProject config;
@@ -156,10 +160,10 @@ public class RegExtension {
     }
 
     public void configureJarTask(AbstractCopyTask task) {
-        task.from(project.zipTree(getJarPath(RegistrationUtilsExtension.SubProject.Type.COMMON, null))).exclude("META-INF/MANIFEST.MF");
+        task.from(project.zipTree(getJarPath(RegistrationUtilsExtension.SubProject.Type.COMMON, null))).exclude(EXCLUDE_FILES);
         if (config.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON) {
             task.doFirst(t -> loaderSpecific());
-            task.from(project.zipTree(getJarPath(config.type.get(), null))).exclude("META-INF/MANIFEST.MF");
+            task.from(project.zipTree(getJarPath(config.type.get(), null))).exclude(EXCLUDE_FILES);
         }
     }
 
@@ -178,6 +182,51 @@ public class RegExtension {
         final var dep = project.getDependencies().create(dependencyNotation(type));
         maybeCreateJar(type, typeSourcesIn, type.toString(), "com.matyrobbrt.registrationutils", typeSourcesJar);
         return dep;
+    }
+
+    @SuppressWarnings("unused")
+    public Dependency joined() {
+        final var type = config.type.get();
+        if (type == RegistrationUtilsExtension.SubProject.Type.COMMON)
+            return common();
+
+        final var dep = project.getDependencies().create(group + ":" + JAR_NAME + "-joined-" + type + ":" + RegistrationUtilsPlugin.VERSION);
+        common(); // Make sure common exists
+        final var commonJarPath = getJarPath(null, null);
+        loaderSpecific(); // Make sure type exists
+        final var typeJarPath = getJarPath(type, null);
+        final var outPath = cachePath.resolve(JAR_NAME + "-joined-" + type + "-" + RegistrationUtilsPlugin.VERSION + ".jar");
+
+        if (Files.exists(outPath) && !(project.hasProperty(FORCE_GENERATION_PROPERTY) || project.getGradle().getStartParameter().isRefreshDependencies())) {
+            return dep;
+        }
+
+        try {
+            Files.deleteIfExists(outPath);
+            Files.createFile(outPath);
+            try (final var commonJar = new JarFile(commonJarPath.toFile());
+                final var typeJar = new JarFile(typeJarPath.toFile());
+                final var out = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(outPath.toFile())))) {
+                copyEntries(null, commonJar, out);
+                copyEntries(commonJar, typeJar, out);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return dep;
+    }
+
+    @ParametersAreNonnullByDefault
+    private static void copyEntries(@Nullable JarFile other, JarFile in, JarOutputStream out) throws IOException {
+        for (final var entries = in.entries(); entries.hasMoreElements();) {
+            final var entry = entries.nextElement();
+            if (other == null || other.getEntry(entry.getName()) == null) {
+                // Doesn't exist already
+                out.putNextEntry(entry);
+                in.getInputStream(entry).transferTo(out);
+                out.closeEntry();
+            }
+        }
     }
 
     /**
@@ -314,7 +363,7 @@ public class RegExtension {
         if (type == null) {
             return group + ":" + JAR_NAME + ":" + RegistrationUtilsPlugin.VERSION;
         } else {
-            return group + ":" + JAR_NAME + ":" + RegistrationUtilsPlugin.VERSION + ":" + type.name().toLowerCase(Locale.ROOT);
+            return group + ":" + JAR_NAME + "-" + type + ":" + RegistrationUtilsPlugin.VERSION;
         }
     }
 
@@ -322,7 +371,7 @@ public class RegExtension {
         if (type == null || type == RegistrationUtilsExtension.SubProject.Type.COMMON) {
             return cachePath.resolve(appendClassifier(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION, classifier) + ".jar");
         } else {
-            return cachePath.resolve(appendClassifier(appendClassifier(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION, type.name().toLowerCase(Locale.ROOT)), classifier) + ".jar");
+            return cachePath.resolve(appendClassifier(JAR_NAME + "-" + type + "-" + RegistrationUtilsPlugin.VERSION, classifier) + ".jar");
         }
     }
 
