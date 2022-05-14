@@ -67,7 +67,7 @@ public interface MainClassHolderTransformer {
                             .filter(MethodInsnNode.class::isInstance)
                             .map(MethodInsnNode.class::cast)
                             .filter(i -> i.owner.equals(clazz.superName))
-                            .filter(i -> i.name.equals("<init>"))
+                            .filter(i -> i.name.equals("<init>") || i.name.equals(mthd.name))
                             .findFirst()
                             .ifPresentOrElse(superInsn -> mthd.instructions.insert(superInsn, newInsn), () -> mthd.instructions.insert(newInsn));
                         return true;

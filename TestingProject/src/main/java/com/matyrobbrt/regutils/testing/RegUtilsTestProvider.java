@@ -31,6 +31,6 @@ package com.matyrobbrt.regutils.testing;
 import net.minecraft.core.Registry;
 import net.minecraft.world.item.Item;
 
-public class RegUtilsTestProvider {
-     public static final RegistrationProvider<Item> PROVIDER = RegistrationProvider.get(Registry.ITEM_REGISTRY, "test");
+public interface RegUtilsTestProvider {
+     RegistrationProvider<Item> PROVIDER = RegistrationProvider.get(Registry.ITEM_REGISTRY, "test");
 }

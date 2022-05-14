@@ -39,6 +39,7 @@ import javax.inject.Inject;
 import java.io.Serializable;
 import java.util.Locale;
 
+@SuppressWarnings("unused")
 public class RegistrationUtilsExtension extends GroovyObjectSupport {
     public static final String NAME = "registrationUtils";
 
@@ -109,7 +110,7 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
             this.name = name;
             this.root = root;
             this.type = root.getObjects().property(Type.class).convention(Type.COMMON);
-            this.project = root.getObjects().property(Project.class).convention(root.findProject(name));
+            this.project = root.getObjects().property(Project.class).convention(root.findProject(":" + name));
             mainClass = root.getObjects().property(String.class);
             modInitMethod = root.getObjects().property(String.class).convention(MainClassHolderTransformer.COMPUTE_FLAG);
 
@@ -120,7 +121,7 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
 
         public void type(String type) {
             this.type.set(switch (type.toLowerCase(Locale.ROOT)) {
-                case "fabric" -> Type.FABRIC;
+                case "fabric", "quilt" -> Type.FABRIC; // Currently, quilt is the same as fabric
                 case "forge" -> Type.FORGE;
                 case "common" -> Type.COMMON;
                 default -> throw new IllegalArgumentException("Unknown project type " + type);

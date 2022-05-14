@@ -29,12 +29,10 @@
 package com.matyrobbrt.regutils.testing;
 
 import net.fabricmc.api.ModInitializer;
-import net.minecraft.core.Registry;
 
 public class RegUtilsFabricTest implements ModInitializer {
     @Override
     public void onInitialize() {
         // This is just a dummy statement
-        FabricRegistrationFactory.INSTANCE.create((Registry<?>) null, null);
     }
 }

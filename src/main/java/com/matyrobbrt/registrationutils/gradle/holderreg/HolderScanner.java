@@ -30,6 +30,7 @@ package com.matyrobbrt.registrationutils.gradle.holderreg;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
@@ -43,9 +44,12 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.objectweb.asm.Opcodes.*;
 
 public class HolderScanner {
+    public static final String INNER_NAME = "RegUtils";
+
     private final Set<String> foundClasses = new HashSet<>();
 
     private final String registrationProvider;
@@ -75,14 +79,54 @@ public class HolderScanner {
             }
         }
         if (found) {
-            foundClasses.add(clazz.name.replace('/', '.'));
             final var cw = new ClassWriter(Opcodes.ASM9);
-            clazz.interfaces.add(registryHolderType);
-            clazz.methods.stream()
-                    .filter(m -> m.name.equals("<init>"))
-                    .forEach(n -> n.access = changeAccess(n.access));
+            if ((clazz.access & ACC_INTERFACE) != 0) {
+                // Is an interface, we need to use an inner class
+                final var innerName = clazz.name + "$" + INNER_NAME;
+                clazz.visitInnerClass(innerName, clazz.name, INNER_NAME, ACC_PUBLIC | Opcodes.ACC_STATIC | ACC_SUPER);
+
+                final var innerCw = new ClassWriter(0);
+
+                innerCw.visit(Opcodes.ASM9, ACC_PUBLIC | ACC_SUPER, innerName, null, "java/lang/Object", new String[] {registryHolderType});
+                {
+                    final var methodVisitor = innerCw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
+                    methodVisitor.visitCode();
+                    Label label0 = new Label();
+                    methodVisitor.visitLabel(label0);
+                    methodVisitor.visitLineNumber(7, label0);
+                    methodVisitor.visitVarInsn(ALOAD, 0);
+                    methodVisitor.visitMethodInsn(INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+                    Label label1 = new Label();
+                    methodVisitor.visitLabel(label1);
+                    methodVisitor.visitLineNumber(8, label1);
+                    methodVisitor.visitLdcInsn(Type.getObjectType(clazz.name));
+                    methodVisitor.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Class", "getName", "()Ljava/lang/String;", false);
+                    methodVisitor.visitInsn(POP);
+                    Label label2 = new Label();
+                    methodVisitor.visitLabel(label2);
+                    methodVisitor.visitLineNumber(9, label2);
+                    methodVisitor.visitInsn(RETURN);
+                    Label label3 = new Label();
+                    methodVisitor.visitLabel(label3);
+                    methodVisitor.visitLocalVariable("this", "L" + innerName + ";", null, label0, label3, 0);
+                    methodVisitor.visitMaxs(1, 1);
+                    methodVisitor.visitEnd();
+                }
+                innerCw.visitEnd();
+
+                Files.write(path.getParent().resolve(path.toString().replace(".class", "") + "$" + INNER_NAME + ".class"), innerCw.toByteArray());
+
+                foundClasses.add(innerName.replace('/', '.'));
+                logger.trace("Transforming interface {}: adding inner class {} with RegistryHolder interface", clazz.name, INNER_NAME);
+            } else {
+                foundClasses.add(clazz.name.replace('/', '.'));
+                clazz.interfaces.add(registryHolderType);
+                clazz.methods.stream()
+                        .filter(m -> m.name.equals("<init>"))
+                        .forEach(n -> n.access = changeAccess(n.access));
+                logger.trace("Transforming class {}: adding RegistryHolder interface", clazz.name);
+            }
             clazz.accept(cw);
-            logger.trace("Transforming class {}: adding RegistryHolder interface", clazz.name);
             Files.write(path, cw.toByteArray());
         }
         return found;
@@ -93,6 +137,6 @@ public class HolderScanner {
     }
 
     public static int changeAccess(final int access) {
-        return access & ~(Opcodes.ACC_PRIVATE | Opcodes.ACC_PROTECTED) | Opcodes.ACC_PUBLIC;
+        return access & ~(Opcodes.ACC_PRIVATE | Opcodes.ACC_PROTECTED) | ACC_PUBLIC;
     }
 }
