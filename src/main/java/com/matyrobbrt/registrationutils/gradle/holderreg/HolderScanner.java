@@ -87,7 +87,7 @@ public class HolderScanner {
 
                 final var innerCw = new ClassWriter(0);
 
-                innerCw.visit(Opcodes.ASM9, ACC_PUBLIC | ACC_SUPER, innerName, null, "java/lang/Object", new String[] {registryHolderType});
+                innerCw.visit(V17, ACC_PUBLIC | ACC_SUPER, innerName, null, "java/lang/Object", new String[] {registryHolderType});
                 {
                     final var methodVisitor = innerCw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
                     methodVisitor.visitCode();
