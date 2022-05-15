@@ -57,6 +57,7 @@ import org.objectweb.asm.tree.ClassNode;
 
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -71,24 +72,23 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public class RegExtension {
 
     public static final String NAME = "reg";
     public static final String JAR_NAME = "regutils";
     public static final String FORCE_GENERATION_PROPERTY = "regForceGeneration";
-
-    public static final String[] EXCLUDE_FILES = {
-        "META-INF/MANIFEST.MF",
-        "fabric.mod.json"
-    };
 
     private final Project project;
     private final RegistrationUtilsExtension.SubProject config;
@@ -111,7 +111,7 @@ public class RegExtension {
         final var cache = cachePath.resolve("cache");
         final var provider = new RegArtifactProvider(group, cachePath);
         GradleRepositoryAdapter.add(project.getRepositories(), "reg_" + random, cache.toFile(),
-            SimpleRepository.of(ArtifactProviderBuilder.begin(ArtifactIdentifier.class).provide(provider))
+                SimpleRepository.of(ArtifactProviderBuilder.begin(ArtifactIdentifier.class).provide(provider))
         );
 
         final var type = config.type.get().toString();
@@ -154,16 +154,67 @@ public class RegExtension {
         this.typeSourcesJar = internal.getTasks().create("regTypeSourcesJar", JarTask.class, task -> {
             task.from(typeSourcesIn);
             task.getDestinationDirectory().set(cachePath.toFile());
-            task.getArchiveBaseName().set(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION + "-" + type);
+            task.getArchiveBaseName().set(JAR_NAME + "-" + type + "-" + RegistrationUtilsPlugin.VERSION);
             task.getArchiveClassifier().set("sources");
         });
     }
 
     public void configureJarTask(AbstractCopyTask task) {
-        task.from(project.zipTree(getJarPath(RegistrationUtilsExtension.SubProject.Type.COMMON, null))).exclude(EXCLUDE_FILES);
-        if (config.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON) {
-            task.doFirst(t -> loaderSpecific());
-            task.from(project.zipTree(getJarPath(config.type.get(), null))).exclude(EXCLUDE_FILES);
+        try {
+            final var extDir = project.getBuildDir().toPath().resolve(RegistrationUtilsPlugin.CACHE_FOLDER).resolve("ext").resolve(RegistrationUtilsPlugin.VERSION).resolve(config.type.get().toString());
+            deleteDir(extDir);
+            Files.createDirectories(extDir.getParent());
+            // TODO find a better solution here
+            task.doFirst(new Action<Task>() {
+                @Override
+                public void execute(Task t) {
+                    common();
+                    loaderSpecific();
+                    try {
+                        final Predicate<String> pred = f -> {
+                            f = f.trim();
+                            return !f.endsWith("MANIFEST.MF") && !f.contains("mod.json");
+                        };
+                        extractSubDir(getJarPath(RegistrationUtilsExtension.SubProject.Type.COMMON, null), extDir, pred);
+                        if (config.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON) {
+                            extractSubDir(getJarPath(config.type.get(), null), extDir, pred);
+                        }
+                    } catch (IOException e) {
+                        throw new RuntimeException("Exception trying to add reg to jar: ", e);
+                    }
+                }
+            });
+            task.from(extDir);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void extractSubDir(Path zipFile, Path outputPath, Predicate<String> predicate)
+            throws IOException {
+        // Open the file
+        try (final ZipFile file = new ZipFile(zipFile.toFile())) {
+            // Get file entries
+            final Enumeration<? extends ZipEntry> entries = file.entries();
+
+            // Iterate over entries
+            while (entries.hasMoreElements()) {
+                final ZipEntry entry = entries.nextElement();
+                // Make sure we want the file
+                System.out.printf("Found entry %s.. Predicate result: %s \n", entry.getName(), predicate.test(entry.getName()));
+                if (predicate.test(entry.getName()) && !entry.isDirectory()) {
+                    // Create the file
+                    final var is = file.getInputStream(entry);
+                    final BufferedInputStream bis = new BufferedInputStream(is);
+                    final Path uncompressedFilePath = outputPath.resolve(entry.getName());
+                    Files.createDirectories(uncompressedFilePath.getParent());
+                    final var fileOutput = Files.newOutputStream(uncompressedFilePath);
+                    while (bis.available() > 0) {
+                        fileOutput.write(bis.read());
+                    }
+                    fileOutput.close();
+                }
+            }
         }
     }
 
@@ -205,8 +256,8 @@ public class RegExtension {
             Files.deleteIfExists(outPath);
             Files.createFile(outPath);
             try (final var commonJar = new JarFile(commonJarPath.toFile());
-                final var typeJar = new JarFile(typeJarPath.toFile());
-                final var out = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(outPath.toFile())))) {
+                 final var typeJar = new JarFile(typeJarPath.toFile());
+                 final var out = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(outPath.toFile())))) {
                 copyEntries(null, commonJar, out);
                 copyEntries(commonJar, typeJar, out);
             }
@@ -218,7 +269,7 @@ public class RegExtension {
 
     @ParametersAreNonnullByDefault
     private static void copyEntries(@Nullable JarFile other, JarFile in, JarOutputStream out) throws IOException {
-        for (final var entries = in.entries(); entries.hasMoreElements();) {
+        for (final var entries = in.entries(); entries.hasMoreElements(); ) {
             final var entry = entries.nextElement();
             if (other == null || other.getEntry(entry.getName()) == null) {
                 // Doesn't exist already
@@ -338,24 +389,24 @@ public class RegExtension {
         if (project.getPlugins().hasPlugin("eclipse")) {
             final var eclipse = project.getExtensions().getByType(EclipseModel.class);
             eclipse.classpath(cp -> cp.file(file -> file.whenMerged((Classpath classpath) -> classpath.getEntries().stream()
-                .filter(Library.class::isInstance)
-                .map(Library.class::cast)
-                .filter(lib -> lib.getPath().contains(jarName))
-                .filter(lib -> lib.getSourcePath() == null)
-                .findFirst()
-                .ifPresent(lib -> lib.setSourcePath(classpath.fileReference(sourcesJar))))));
+                    .filter(Library.class::isInstance)
+                    .map(Library.class::cast)
+                    .filter(lib -> lib.getPath().contains(jarName))
+                    .filter(lib -> lib.getSourcePath() == null)
+                    .findFirst()
+                    .ifPresent(lib -> lib.setSourcePath(classpath.fileReference(sourcesJar))))));
         }
 
         if (project.getPlugins().hasPlugin("idea")) {
             final var idea = project.getPlugins().getPlugin(IdeaPlugin.class);
             idea.getModel().module(mod -> mod.iml(iml -> iml.whenMerged($ -> idea.getModel().getModule().resolveDependencies()
-                .stream()
-                .filter(ModuleLibrary.class::isInstance)
-                .map(ModuleLibrary.class::cast)
-                .filter(lib -> lib.getClasses().stream().anyMatch(p -> p.getUrl().contains(jarName)))
-                .filter(lib -> lib.getSources().isEmpty())
-                .findFirst()
-                .ifPresent(lib -> lib.getSources().add(new org.gradle.plugins.ide.idea.model.Path("jar://" + sourcesJar + "!/"))))));
+                    .stream()
+                    .filter(ModuleLibrary.class::isInstance)
+                    .map(ModuleLibrary.class::cast)
+                    .filter(lib -> lib.getClasses().stream().anyMatch(p -> p.getUrl().contains(jarName)))
+                    .filter(lib -> lib.getSources().isEmpty())
+                    .findFirst()
+                    .ifPresent(lib -> lib.getSources().add(new org.gradle.plugins.ide.idea.model.Path("jar://" + sourcesJar + "!/"))))));
         }
     }
 
