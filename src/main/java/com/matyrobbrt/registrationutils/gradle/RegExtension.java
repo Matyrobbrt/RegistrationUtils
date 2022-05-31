@@ -201,7 +201,6 @@ public class RegExtension {
             while (entries.hasMoreElements()) {
                 final ZipEntry entry = entries.nextElement();
                 // Make sure we want the file
-                System.out.printf("Found entry %s.. Predicate result: %s \n", entry.getName(), predicate.test(entry.getName()));
                 if (predicate.test(entry.getName()) && !entry.isDirectory()) {
                     // Create the file
                     final var is = file.getInputStream(entry);

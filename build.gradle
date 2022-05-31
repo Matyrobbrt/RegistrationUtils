@@ -18,9 +18,10 @@ plugins {
 	id 'idea'
 	id 'com.github.johnrengelman.shadow' version '7.1.2'
 	id 'org.cadixdev.licenser' version '0.6.1' apply false
-	id 'com.matyrobbrt.mc.registrationutils' version '0.1.0-testing'
+	// id 'com.matyrobbrt.mc.registrationutils' version '0.1.0-testing'
 }
 
+/*
 registrationUtils {
 	// TODO testing should really be a separated project
 	group 'com.matyrobbrt.regutils.testing'
@@ -34,6 +35,7 @@ registrationUtils {
 	transformHolderLoading true
 	addDependencies false
 }
+*/
 
 group = 'com.matyrobbrt.mc.registrationutils'
 
@@ -123,6 +125,13 @@ pluginBundle {
 	tags = ['minecraft', 'forge', 'fabric', 'multiloader']
 }
 
+components.java.withVariantsFromConfiguration(configurations.runtimeElements) {
+    skip()
+}
+components.java.withVariantsFromConfiguration(configurations.apiElements) {
+    skip()
+}
+
 gradlePlugin {
 	plugins {
 		registrationUtils {
@@ -151,9 +160,12 @@ tasks.create('relocateShadowJar', ConfigureShadowRelocation) {
 tasks.named('shadowJar', ShadowJar).configure {
 	archiveClassifier.set('')
 	configurations = [project.configurations.shade]
-	minimize()
 	dependsOn('relocateShadowJar')
 	manifest.attributes(makeAttributes())
+}
+
+jar {
+	classifier 'lite'
 }
 
 Map<?, ?> makeAttributes() {

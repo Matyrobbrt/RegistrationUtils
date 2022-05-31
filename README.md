@@ -14,7 +14,8 @@ The steps that the plugin makes:
 To start, in your root `build.gradle`, add the following lines in order to install the plugin:
 ```groovy
 plugins {
-    id 'com.matyrobbrt.mc.registrationutils' // The plugin is located at the Gradle plugin portal
+    id 'com.matyrobbrt.mc.registrationutils' version "$regVersion" // The plugin is located at the Gradle plugin portal
+    // The latest reg version can be found at https://plugins.gradle.org/plugin/com.matyrobbrt.mc.registrationutils
 }
 ```
 Next, we need to configure it. That is done in the `registrationUtils` block.
@@ -33,3 +34,15 @@ projects {
 ```
 And with that, we're done with the basic configuration of the plugin!
 You can now reload Gradle and you should have access to the library.
+
+The full example from above:
+```groovy
+registrationUtils {
+    group 'com.example.examplemod.registration'
+    projects {
+        Fabric { type 'fabric' } // The fabric project
+        Forge { type 'forge' } // The forge project
+        Common  { type 'common' } // The common project
+    }
+}
+```
