@@ -11,7 +11,7 @@ your mod jars. The steps that the plugin makes:
 
 - unpack and relocate the compiled library
 - add the library as a dependency to the subprojects (Common, Forge and Fabric)
-- make the `jar` task include the library in the final jar
+- make the `jar` task include the library in the final jar.
   **Do not worry about licensing!** The library is MIT licensed, and the plugin makes sure that an original copy of the
   license is included in the final jar, so you're clear.
 
