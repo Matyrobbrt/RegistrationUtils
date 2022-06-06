@@ -43,6 +43,7 @@ import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.tasks.AbstractCopyTask;
+import org.gradle.api.tasks.bundling.AbstractArchiveTask;
 import org.gradle.api.tasks.bundling.Jar;
 import org.gradle.plugins.ide.eclipse.model.Classpath;
 import org.gradle.plugins.ide.eclipse.model.EclipseModel;
@@ -159,13 +160,24 @@ public class RegExtension {
         });
     }
 
-    public void configureJarTask(AbstractCopyTask task) {
+    public void configureJarTask(Object task) {
+        AbstractCopyTask tsk;
+        if (task instanceof String str) {
+            final var maybeTask = project.getTasks().getByName(str);
+            if (maybeTask instanceof AbstractCopyTask asb) {
+                tsk = asb;
+            } else
+                throw new RuntimeException("Cannot configure task of type " + maybeTask + " in order to include Reg");
+        } else if (task instanceof AbstractCopyTask asb)
+            tsk = asb;
+        else
+            throw new RuntimeException("Cannot find task " + task);
         try {
             final var extDir = project.getBuildDir().toPath().resolve(RegistrationUtilsPlugin.CACHE_FOLDER).resolve("ext").resolve(RegistrationUtilsPlugin.VERSION).resolve(config.type.get().toString());
             deleteDir(extDir);
             Files.createDirectories(extDir.getParent());
             // TODO find a better solution here
-            task.doFirst(new Action<Task>() {
+            tsk.doFirst(new Action<Task>() {
                 @Override
                 public void execute(Task t) {
                     common();
@@ -184,7 +196,7 @@ public class RegExtension {
                     }
                 }
             });
-            task.from(extDir);
+            tsk.from(extDir);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
