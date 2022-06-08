@@ -23,6 +23,9 @@ To start, in your root `build.gradle`, add the following lines in order to insta
 plugins {
     id 'com.matyrobbrt.mc.registrationutils' version "$regVersion" // The plugin is located at the Gradle plugin portal
     // The latest reg version can be found at https://plugins.gradle.org/plugin/com.matyrobbrt.mc.registrationutils
+    // Please make sure to use a version compatible with your minecraft version:
+    // 1.18.2 -> 0.x.x versions
+    // 1.19+ -> mcVersion-x.x.x versions
 }
 ```
 

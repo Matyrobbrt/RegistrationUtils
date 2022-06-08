@@ -9,6 +9,13 @@ buildscript {
 	dependencies {
 		classpath 'org.codehaus.groovy:groovy-all:3.0.9'
 	}
+	// Hacky workaround to shadow using an outdated ASM version
+	configurations.all {
+		resolutionStrategy {
+			force("org.ow2.asm:asm:9.3")
+			force("org.ow2.asm:asm-commons:9.3")
+		}
+	}
 }
 
 plugins {
@@ -188,5 +195,9 @@ allprojects {
 	apply plugin: 'org.cadixdev.licenser'
 	license {
 		header = rootProject.file('licenseheader.txt')
+	}
+	java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+	repositories {
+		mavenCentral()
 	}
 }

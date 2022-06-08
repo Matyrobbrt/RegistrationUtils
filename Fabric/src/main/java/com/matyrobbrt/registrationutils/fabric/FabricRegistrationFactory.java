@@ -101,7 +101,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
                 @Override
                 public Holder<I> asHolder() {
-                    return (Holder<I>) registry.getOrCreateHolder((ResourceKey<T>) this.key);
+                    return (Holder<I>) registry.getOrCreateHolderOrThrow((ResourceKey<T>) this.key);
                 }
             };
             entries.add((RegistryObject<T>) ro);
