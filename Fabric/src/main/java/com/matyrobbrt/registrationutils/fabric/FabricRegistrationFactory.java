@@ -77,6 +77,16 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
         }
 
         @Override
+        public Registry<T> getRegistry() {
+            return registry;
+        }
+
+        @Override
+        public ResourceKey<? extends Registry<T>> getRegistryKey() {
+            return registry.key();
+        }
+
+        @Override
         @SuppressWarnings("unchecked")
         public <I extends T> RegistryObject<I> register(String name, Supplier<? extends I> supplier) {
             final var rl = new ResourceLocation(modId, name);

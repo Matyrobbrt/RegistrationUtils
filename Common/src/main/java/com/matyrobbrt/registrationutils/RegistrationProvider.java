@@ -99,6 +99,20 @@ public interface RegistrationProvider<T> {
     Collection<RegistryObject<T>> getEntries();
 
     /**
+     * Gets the registry key stored in this provider.
+     *
+     * @return the registry key stored in this provider
+     */
+    ResourceKey<? extends Registry<T>> getRegistryKey();
+
+    /**
+     * Gets the registry stored in this provider.
+     *
+     * @return the registry stored in this provider
+     */
+    Registry<T> getRegistry();
+
+    /**
      * Gets the mod id that this provider registers objects for.
      *
      * @return the mod id

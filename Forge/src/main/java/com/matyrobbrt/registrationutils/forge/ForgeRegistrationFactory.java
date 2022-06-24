@@ -34,9 +34,11 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.DeferredRegister;
 
+import javax.annotation.Nonnull;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -46,6 +48,15 @@ public class ForgeRegistrationFactory implements RegistrationProvider.Factory {
 
     @Override
     public <T> RegistrationProvider<T> create(ResourceKey<? extends Registry<T>> resourceKey, String modId) {
+        final var register = DeferredRegister.create(resourceKey, modId);
+        register.register(getBus(modId));
+        return new Provider<>(modId, register);
+    }
+
+    @Nonnull
+    private static IEventBus getBus(String modId) {
+        if (modId.equals("minecraft"))
+            modId = "forge"; // Defer minecraft namespace to forge bus
         final var containerOpt = ModList.get().getModContainerById(modId);
         if (containerOpt.isEmpty())
             throw new NullPointerException("Cannot find mod container for id " + modId);
@@ -53,9 +64,7 @@ public class ForgeRegistrationFactory implements RegistrationProvider.Factory {
         if (modBus == null) {
             throw new NullPointerException("Cannot get the mod event bus for the mod container with the mod id of " + modId);
         }
-        final var register = DeferredRegister.create(resourceKey, modId);
-        register.register(modBus);
-        return new Provider<>(modId, register);
+        return modBus;
     }
 
     private static class Provider<T> implements RegistrationProvider<T> {
@@ -73,6 +82,22 @@ public class ForgeRegistrationFactory implements RegistrationProvider.Factory {
         @Override
         public String getModId() {
             return modId;
+        }
+
+        @Override
+        public ResourceKey<? extends Registry<T>> getRegistryKey() {
+            return registry.getRegistryKey();
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public Registry<T> getRegistry() {
+            return (Registry<T>) get(Registry.REGISTRY, getRegistryKey());
+        }
+
+        @SuppressWarnings("unchecked")
+        private static <T> T get(Registry<T> registry, ResourceKey<?> key) {
+            return registry.get((ResourceKey<T>) key);
         }
 
         @Override
