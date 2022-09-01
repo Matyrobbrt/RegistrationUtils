@@ -43,7 +43,6 @@ import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.tasks.AbstractCopyTask;
-import org.gradle.api.tasks.bundling.AbstractArchiveTask;
 import org.gradle.api.tasks.bundling.Jar;
 import org.gradle.plugins.ide.eclipse.model.Classpath;
 import org.gradle.plugins.ide.eclipse.model.EclipseModel;
@@ -73,7 +72,6 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
-import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
@@ -105,8 +103,9 @@ public class RegExtension {
     public RegExtension(Project root, Project project, RegistrationUtilsExtension parent, RegistrationUtilsExtension.SubProject config) {
         this.project = project;
         this.config = config;
-        this.cachePath = root.getBuildDir().toPath().resolve(RegistrationUtilsPlugin.CACHE_FOLDER).toAbsolutePath();
         this.group = parent.group.get();
+        this.cachePath = root.getBuildDir().toPath().resolve(RegistrationUtilsPlugin.CACHE_FOLDER)
+                .resolve(Utils.getStringFromSHA256(group)).toAbsolutePath();
 
         int random = ThreadLocalRandom.current().nextInt();
         final var cache = cachePath.resolve("cache");
@@ -161,6 +160,14 @@ public class RegExtension {
     }
 
     public void configureJarTask(Object task) {
+        configureJarTask(task, null);
+    }
+
+    public void configureSourcesJarTask(Object task) {
+        configureJarTask(task, "sources");
+    }
+
+    public void configureJarTask(Object task, @Nullable String classifier) {
         AbstractCopyTask tsk;
         if (task instanceof String str) {
             final var maybeTask = project.getTasks().getByName(str);
@@ -168,12 +175,13 @@ public class RegExtension {
                 tsk = asb;
             } else
                 throw new RuntimeException("Cannot configure task of type " + maybeTask + " in order to include Reg");
-        } else if (task instanceof AbstractCopyTask asb)
+        } else if (task instanceof AbstractCopyTask asb) {
             tsk = asb;
-        else
+        } else {
             throw new RuntimeException("Cannot find task " + task);
+        }
         try {
-            final var extDir = project.getBuildDir().toPath().resolve(RegistrationUtilsPlugin.CACHE_FOLDER).resolve("ext").resolve(RegistrationUtilsPlugin.VERSION).resolve(config.type.get().toString());
+            final var extDir = cachePath.resolve("ext_" + tsk.getName()).resolve(RegistrationUtilsPlugin.VERSION).resolve(config.type.get().toString());
             deleteDir(extDir);
             Files.createDirectories(extDir.getParent());
             // TODO find a better solution here
@@ -187,9 +195,9 @@ public class RegExtension {
                             f = f.trim();
                             return !f.endsWith("MANIFEST.MF") && !f.contains("mod.json");
                         };
-                        extractSubDir(getJarPath(RegistrationUtilsExtension.SubProject.Type.COMMON, null), extDir, pred);
+                        extractSubDir(getJarPath(RegistrationUtilsExtension.SubProject.Type.COMMON, classifier), extDir, pred);
                         if (config.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON) {
-                            extractSubDir(getJarPath(config.type.get(), null), extDir, pred);
+                            extractSubDir(getJarPath(config.type.get(), classifier), extDir, pred);
                         }
                     } catch (IOException e) {
                         throw new RuntimeException("Exception trying to add reg to jar: ", e);
@@ -430,10 +438,11 @@ public class RegExtension {
     }
 
     public Path getJarPath(RegistrationUtilsExtension.SubProject.Type type, String classifier) {
+        String actualClassifier = classifier == null || classifier.isBlank() ? "" : "-" + classifier;
         if (type == null || type == RegistrationUtilsExtension.SubProject.Type.COMMON) {
-            return cachePath.resolve(appendClassifier(JAR_NAME, classifier) + "-" + RegistrationUtilsPlugin.VERSION + ".jar");
+            return cachePath.resolve(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION + actualClassifier + ".jar");
         } else {
-            return cachePath.resolve(appendClassifier(JAR_NAME + "-" + type, classifier) + "-" + RegistrationUtilsPlugin.VERSION + ".jar");
+            return cachePath.resolve(JAR_NAME + "-" + type + "-" + RegistrationUtilsPlugin.VERSION + actualClassifier + ".jar");
         }
     }
 
@@ -478,10 +487,6 @@ public class RegExtension {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    private static String appendClassifier(String str, String classifier) {
-        return classifier == null || classifier.isBlank() ? str : str + "-" + classifier;
     }
 
     @SuppressWarnings("ALL")
