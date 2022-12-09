@@ -32,6 +32,7 @@ import com.matyrobbrt.registrationutils.RegistrationProvider;
 import com.matyrobbrt.registrationutils.RegistryObject;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -92,7 +93,7 @@ public class ForgeRegistrationFactory implements RegistrationProvider.Factory {
         @Override
         @SuppressWarnings("unchecked")
         public Registry<T> getRegistry() {
-            return (Registry<T>) get(Registry.REGISTRY, getRegistryKey());
+            return (Registry<T>) get(BuiltInRegistries.REGISTRY, getRegistryKey());
         }
 
         @SuppressWarnings("unchecked")
