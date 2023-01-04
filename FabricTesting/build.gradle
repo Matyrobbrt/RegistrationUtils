@@ -1,0 +1,37 @@
+plugins {
+    id 'fabric-loom' version '0.12-SNAPSHOT'
+    id 'maven-publish'
+    id 'idea'
+    id 'com.matyrobbrt.mc.registrationutils'
+}
+
+registrationUtils {
+    group 'com.matyrobbrt.regtest'
+    projects {
+        Fabric {
+            type 'fabric'
+            project 'root'
+        }
+    }
+}
+
+loom {
+    runs {
+        client {
+            client()
+            setConfigName("Fabric Test Client")
+            ideConfigGenerated(true)
+            runDir("run")
+        }
+    }
+}
+
+final props = new Properties()
+file('../gradle.properties').withReader(props.&load)
+
+dependencies {
+    minecraft "com.mojang:minecraft:${props.get('minecraft_version')}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${props.get('fabric_loader_version')}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${props.get('fabric_version')}"
+}

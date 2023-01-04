@@ -25,24 +25,7 @@ plugins {
 	id 'idea'
 	id 'com.github.johnrengelman.shadow' version '7.1.2'
 	id 'org.cadixdev.licenser' version '0.6.1' apply false
-	// id 'com.matyrobbrt.mc.registrationutils' version '0.1.0-testing'
 }
-
-/*
-registrationUtils {
-	// TODO testing should really be a separated project
-	group 'com.matyrobbrt.regutils.testing'
-	projects {
-		TestingProject {
-			type 'fabric'
-			project ':TestingProject'
-			mainClass 'com.matyrobbrt.regutils.testing.RegUtilsFabricTest'
-		}
-	}
-	transformHolderLoading true
-	addDependencies false
-}
-*/
 
 group = 'com.matyrobbrt.mc.registrationutils'
 
@@ -129,7 +112,7 @@ class ExtraConfiguration {
 pluginBundle {
 	website = 'https://github.com/Matyrobbrt/RegistrationUtils'
 	vcsUrl = 'https://github.com/Matyrobbrt/RegistrationUtils'
-	tags = ['minecraft', 'forge', 'fabric', 'multiloader']
+	tags = ['minecraft', 'forge', 'fabric', 'quilt', 'multiloader']
 }
 
 components.java.withVariantsFromConfiguration(configurations.runtimeElements) {

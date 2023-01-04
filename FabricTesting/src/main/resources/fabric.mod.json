@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "regtest",
+  "version": "1.0",
+  "name": "Test mod",
+  "description": "Test mod",
+  "authors": [
+    "Matyrobbrt"
+  ],
+  "contact": {
+    "homepage": "https://github.com/Matyrobbrt/RegistrationUtils",
+    "sources": "https://github.com/Matyrobbrt/RegistrationUtils"
+  },
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.matyrobbrt.regtest.RegTest"
+    ]
+  },
+  "mixins": [],
+  "depends": {
+    "fabricloader": ">=0.14",
+    "fabric": "*",
+    "minecraft": ">=1.19",
+    "java": ">=17"
+  },
+  "suggests": {
+    "another-mod": "*"
+  }
+}

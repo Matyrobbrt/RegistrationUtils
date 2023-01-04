@@ -34,7 +34,12 @@ import org.gradle.api.plugins.JavaPlugin;
 
 public class RegistrationUtilsPlugin implements Plugin<Project> {
 
-    public static final String VERSION = RegistrationUtilsPlugin.class.getPackage().getImplementationVersion();
+    public static final String VERSION;
+    static {
+        final String ver = RegistrationUtilsPlugin.class.getPackage().getImplementationVersion();
+        VERSION = ver == null ? "dev" : ver;
+    }
+
     public static final String CACHE_FOLDER = "registrationutils";
 
     @Override

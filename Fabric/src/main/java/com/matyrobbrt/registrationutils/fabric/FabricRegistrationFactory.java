@@ -28,9 +28,17 @@
 
 package com.matyrobbrt.registrationutils.fabric;
 
+import com.google.common.base.Suppliers;
 import com.matyrobbrt.registrationutils.RegistrationProvider;
 import com.matyrobbrt.registrationutils.RegistryObject;
+import com.matyrobbrt.registrationutils.registries.RegistryBuilder;
+import com.matyrobbrt.registrationutils.registries.RegistryFeatureType;
+import com.mojang.serialization.Lifecycle;
+import net.fabricmc.fabric.api.event.registry.FabricRegistryBuilder;
+import net.fabricmc.fabric.api.event.registry.RegistryAttribute;
+import net.minecraft.core.DefaultedMappedRegistry;
 import net.minecraft.core.Holder;
+import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
@@ -38,7 +46,9 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -56,7 +66,8 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
     private static class Provider<T> implements RegistrationProvider<T> {
         private final String modId;
-        private final Registry<T> registry;
+        private final Supplier<Registry<T>> registry;
+        private final ResourceKey<? extends Registry<T>> registryKey;
 
         private final Set<RegistryObject<T>> entries = new HashSet<>();
         private final Set<RegistryObject<T>> entriesView = Collections.unmodifiableSet(entries);
@@ -65,35 +76,39 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
         private Provider(String modId, ResourceKey<? extends Registry<T>> key) {
             this.modId = modId;
 
-            final var reg = BuiltInRegistries.REGISTRY.get(key.location());
-            if (reg == null) {
-                throw new RuntimeException("Registry with name " + key.location() + " was not found!");
-            }
-            registry = (Registry<T>) reg;
+            this.registry = Suppliers.memoize(() -> {
+                final var reg = BuiltInRegistries.REGISTRY.get(key.location());
+                if (reg == null) {
+                    throw new RuntimeException("Registry with name " + key.location() + " was not found!");
+                }
+                return (Registry<T>) reg;
+            });
+            this.registryKey = key;
         }
 
         private Provider(String modId, Registry<T> registry) {
             this.modId = modId;
-            this.registry = registry;
+            this.registry = Suppliers.ofInstance(registry);
+            this.registryKey = registry.key();
         }
 
         @Override
         public Registry<T> getRegistry() {
-            return registry;
+            return registry.get();
         }
 
         @Override
         public ResourceKey<? extends Registry<T>> getRegistryKey() {
-            return registry.key();
+            return registryKey;
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public <I extends T> RegistryObject<I> register(String name, Supplier<? extends I> supplier) {
             final var rl = new ResourceLocation(modId, name);
-            final var obj = Registry.register(registry, rl, supplier.get());
+            final var obj = Registry.register(registry.get(), rl, supplier.get());
             final var ro = new RegistryObject<I>() {
-                final ResourceKey<I> key = ResourceKey.create((ResourceKey<? extends Registry<I>>) registry.key(), rl);
+                final ResourceKey<I> key = ResourceKey.create((ResourceKey<? extends Registry<I>>) getRegistryKey(), rl);
 
                 @Override
                 public ResourceKey<I> getResourceKey() {
@@ -112,7 +127,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
                 @Override
                 public Holder<I> asHolder() {
-                    return (Holder<I>) registry.getHolderOrThrow((ResourceKey<T>) this.key);
+                    return (Holder<I>) registry.get().getHolderOrThrow((ResourceKey<T>) this.key);
                 }
             };
             entries.add((RegistryObject<T>) ro);
@@ -127,6 +142,65 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
         @Override
         public String getModId() {
             return modId;
+        }
+
+        @Override
+        public RegistryBuilder<T> registryBuilder() {
+            return new Builder();
+        }
+
+        private final class Builder implements RegistryBuilder<T> {
+            private final Map<RegistryFeatureType<?>, Object> features = new HashMap<>();
+            private Supplier<T> defaultValueSupplier;
+
+            @Override
+            public <X> RegistryBuilder<T> withFeature(RegistryFeatureType<X> type, X value) {
+                features.put(type, value);
+                return this;
+            }
+
+            @Override
+            public RegistryBuilder<T> withFeature(RegistryFeatureType<Void> type) {
+                return this.withFeature(type, null);
+            }
+
+            @Override
+            public RegistryBuilder<T> withDefaultValue(String id, Supplier<T> defaultValueSupplier) {
+                this.defaultValueSupplier = defaultValueSupplier;
+                return this.withFeature(RegistryFeatureType.DEFAULTED, new ResourceLocation(modId, id));
+            }
+
+            @Override
+            public Supplier<Registry<T>> build() {
+                final FabricRegistryBuilder<T, MappedRegistry<T>> builder = FabricRegistryBuilder.from(makeRegistry());
+
+                if (features.containsKey(RegistryFeatureType.SYNCED)) {
+                    builder.attribute(RegistryAttribute.SYNCED);
+                }
+                if (features.containsKey(RegistryFeatureType.SAVED_TO_DISK)) {
+                    builder.attribute(RegistryAttribute.PERSISTED);
+                }
+
+                final Supplier<Registry<T>> sup = Suppliers.ofInstance(builder.buildAndRegister());
+                if (defaultValueSupplier != null) {
+                    Registry.register(sup.get(), (ResourceLocation) features.get(RegistryFeatureType.DEFAULTED), defaultValueSupplier.get());
+                }
+                return sup;
+            }
+
+            public MappedRegistry<T> makeRegistry() {
+                if (features.containsKey(RegistryFeatureType.DEFAULTED)) {
+                    return new DefaultedMappedRegistry<>(
+                            ((ResourceLocation) features.get(RegistryFeatureType.DEFAULTED)).toString(),
+                            registryKey,
+                            Lifecycle.stable(),
+                            false
+                    );
+                }
+                return new MappedRegistry<>(
+                        registryKey, Lifecycle.stable(), false
+                );
+            }
         }
     }
 }

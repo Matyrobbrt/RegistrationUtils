@@ -28,9 +28,11 @@
 
 package com.matyrobbrt.registrationutils;
 
+import com.matyrobbrt.registrationutils.registries.RegistryBuilder;
 import net.minecraft.Util;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.Collection;
 import java.util.ServiceLoader;
@@ -53,23 +55,37 @@ import java.util.function.Supplier;
 public interface RegistrationProvider<T> {
 
     /**
-     * Gets a provider for specified {@code modId} and {@code resourceKey}. <br>
-     * It is <i>recommended</i> to store the resulted provider in a {@code static final} field to
-     * the {@link Factory#INSTANCE factory} creating multiple providers for the same resource key and mod id.
+     * Gets a provider for specified {@code modId} and {@code registryKey}. <br>
+     * It is <i>recommended</i> to store the resulted provider in a {@code static final} field,
+     * so that multiple providers for the same mod ID and registry keys are avoided.
      *
-     * @param resourceKey the {@link ResourceKey} of the registry of the provider
+     * @param registryKey the {@link ResourceKey} of the registry of the provider
      * @param modId       the mod id that the provider will register objects for
      * @param <T>         the type of the provider
      * @return the provider
      */
-    static <T> RegistrationProvider<T> get(ResourceKey<? extends Registry<T>> resourceKey, String modId) {
-        return Factory.INSTANCE.create(resourceKey, modId);
+    static <T> RegistrationProvider<T> get(ResourceKey<? extends Registry<T>> registryKey, String modId) {
+        return Factory.INSTANCE.create(registryKey, modId);
+    }
+
+    /**
+     * Gets a provider for specified {@code modId} and {@code registryKey}. <br>
+     * It is <i>recommended</i> to store the resulted provider in a {@code static final} field,
+     * so that multiple providers for the same mod ID and registry keys are avoided. <br>
+     *
+     * @param registryId the ID of the registry to create this provider for.
+     * @param modId      the mod id that the provider will register objects for
+     * @param <T>        the type of the provider
+     * @return the provider
+     */
+    static <T> RegistrationProvider<T> get(ResourceLocation registryId, String modId) {
+        return Factory.INSTANCE.create(ResourceKey.createRegistryKey(registryId), modId);
     }
 
     /**
      * Gets a provider for specified {@code modId} and {@code registry}. <br>
-     * It is <i>recommended</i> to store the resulted provider in a {@code static final} field to
-     * the {@link Factory#INSTANCE factory} creating multiple providers for the same resource key and mod id.
+     * It is <i>recommended</i> to store the resulted provider in a {@code static final} field,
+     * so that multiple providers for the same mod ID and registry keys are avoided.
      *
      * @param registry the {@link Registry} of the provider
      * @param modId    the mod id that the provider will register objects for
@@ -118,6 +134,14 @@ public interface RegistrationProvider<T> {
      * @return the mod id
      */
     String getModId();
+
+    /**
+     * Creates a builder for creating a registry with this {@link #getRegistryKey() key}. <br>
+     * Note: on Fabric this feature requires the Fabric API.
+     *
+     * @return a builder for the registry
+     */
+    RegistryBuilder<T> registryBuilder();
 
     /**
      * Factory class for {@link RegistrationProvider registration providers}. <br>

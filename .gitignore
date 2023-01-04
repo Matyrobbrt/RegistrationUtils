@@ -4,6 +4,9 @@
 /logs/
 /data/
 /maven/
+/FabricTesting/build/
+/FabricTesting/run/
+/FabricTesting/.gradle/
 
 #Hidden Directories
 .gradle/
