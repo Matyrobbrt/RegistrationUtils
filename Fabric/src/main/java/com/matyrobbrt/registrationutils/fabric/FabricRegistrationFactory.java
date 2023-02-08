@@ -43,6 +43,7 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.ApiStatus;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -64,7 +65,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
         return new Provider<>(modId, registry);
     }
 
-    private static class Provider<T> implements RegistrationProvider<T> {
+    private static class Provider<T> implements RegistrationProvider<T>, InternalFabricHelper<T> {
         private final String modId;
         private final Supplier<Registry<T>> registry;
         private final ResourceKey<? extends Registry<T>> registryKey;
@@ -103,10 +104,14 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public <I extends T> RegistryObject<I> register(String name, Supplier<? extends I> supplier) {
             final var rl = new ResourceLocation(modId, name);
-            final var obj = Registry.register(registry.get(), rl, supplier.get());
+            return create(rl, Registry.register(registry.get(), rl, supplier.get()));
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <I extends T> RegistryObject<I> create(ResourceLocation rl, I obj) {
             final var ro = new RegistryObject<I>() {
                 final ResourceKey<I> key = ResourceKey.create((ResourceKey<? extends Registry<I>>) getRegistryKey(), rl);
 
@@ -202,5 +207,10 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
                 );
             }
         }
+    }
+
+    @ApiStatus.Internal
+    interface InternalFabricHelper<T> {
+        <I extends T> RegistryObject<I> create(ResourceLocation name, I object);
     }
 }
