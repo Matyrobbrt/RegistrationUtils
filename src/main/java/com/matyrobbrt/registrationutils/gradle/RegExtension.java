@@ -30,6 +30,8 @@ package com.matyrobbrt.registrationutils.gradle;
 
 import com.matyrobbrt.registrationutils.gradle.holderreg.HolderScanner;
 import com.matyrobbrt.registrationutils.gradle.task.RelocateResourceTask;
+import groovy.json.JsonGenerator;
+import groovy.json.JsonSlurper;
 import me.lucko.jarrelocator.JarRelocator;
 import me.lucko.jarrelocator.Relocation;
 import net.minecraftforge.artifactural.api.artifact.ArtifactIdentifier;
@@ -43,6 +45,7 @@ import org.gradle.api.artifacts.Dependency;
 import org.gradle.api.internal.project.ProjectInternal;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.tasks.AbstractCopyTask;
+import org.gradle.api.tasks.bundling.AbstractArchiveTask;
 import org.gradle.api.tasks.bundling.Jar;
 import org.gradle.plugins.ide.eclipse.model.Classpath;
 import org.gradle.plugins.ide.eclipse.model.EclipseModel;
@@ -63,15 +66,20 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
@@ -88,6 +96,8 @@ public class RegExtension {
     public static final String NAME = "reg";
     public static final String JAR_NAME = "regutils";
     public static final String FORCE_GENERATION_PROPERTY = "regForceGeneration";
+    public static final JsonSlurper PARSER = new JsonSlurper();
+    public static final JsonGenerator GENERATOR = new JsonGenerator.Options().build();
 
     private final Project project;
     private final RegistrationUtilsExtension.SubProject config;
@@ -204,7 +214,55 @@ public class RegExtension {
                     }
                 }
             });
-            tsk.from(extDir);
+
+            if (config.type.get() == RegistrationUtilsExtension.SubProject.Type.FABRIC && tsk instanceof final AbstractArchiveTask jar) {
+                final String configName = "regutils-" + Utils.getAlphaNumericString(7) + "-" + group.replace('.', '-');
+                final String mixinsConfig = configName + ".mixins.json";
+                tsk.from(extDir, spec -> spec.rename("regutils.mixins.json", mixinsConfig)
+                        .rename("regutils.refmap.json", configName + ".refmap.json"));
+
+                tsk.doLast(new Action<Task>() {
+                    @Override
+                    @SuppressWarnings({"rawtypes", "unchecked"})
+                    public void execute(Task task) {
+                        try (final FileSystem fs = FileSystems.newFileSystem(jar.getArchiveFile().get().getAsFile().toPath())) {
+                            final Path configPath = fs.getPath(mixinsConfig);
+                            if (Files.exists(configPath)) {
+                                final String str = Files.readString(configPath);
+                                Files.writeString(configPath, str.replace("regutils.refmap.json", configName + ".refmap.json"));
+                            }
+
+                            final Path fmj = fs.getPath("fabric.mod.json");
+                            if (Files.exists(fmj)) {
+                                final Map map = (Map) PARSER.parse(fmj);
+                                final Object mixins = map.computeIfAbsent("mixins", o -> new ArrayList<>());
+                                if (mixins instanceof List list) {
+                                    list.add(mixinsConfig);
+                                } else {
+                                    map.put("mixins", List.of(mixins, mixinsConfig));
+                                }
+                                Files.writeString(fmj, GENERATOR.toJson(map));
+                            }
+
+                            final Path qmj = fs.getPath("quilt.mod.json");
+                            if (Files.exists(qmj)) {
+                                final Map map = (Map) PARSER.parse(qmj);
+                                final Object mixins = map.computeIfAbsent("mixin", o -> new ArrayList<>());
+                                if (mixins instanceof List list) {
+                                    list.add(mixinsConfig);
+                                } else {
+                                    map.put("mixin", List.of(mixins, mixinsConfig));
+                                }
+                                Files.writeString(qmj, GENERATOR.toJson(map));
+                            }
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                });
+            } else {
+                tsk.from(extDir, spec -> spec.exclude("regutils.mixins.json", "regutils.refmap.json"));
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -350,8 +408,9 @@ public class RegExtension {
                 relocator.run();
 
                 final var groupPattern = Pattern.compile(inGroup.replace(".", "\\."));
+                final var groupPatternND = Pattern.compile(inGroup.replace('.', '/'));
 
-                // Now we gotta rename META-INFs
+                // Now we gotta rename META-INFs or (mixin) jsons
                 try (JarOutputStream out = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(jarPath.toFile())))) {
                     try (JarFile in = new JarFile(finishedTemp.toFile())) {
                         for (Enumeration<JarEntry> entries = in.entries(); entries.hasMoreElements(); ) {
@@ -359,29 +418,43 @@ public class RegExtension {
 
                             final var name = entry.getName();
                             final var is = in.getInputStream(entry);
-                            if (!name.startsWith("META-INF/services/") || entry.isDirectory()) {
+
+                            final boolean isService = name.startsWith("META-INF/services/");
+                            final boolean isJson = name.endsWith(".json");
+                            if (!(isService || isJson) || entry.isDirectory()) {
                                 out.putNextEntry(entry);
                                 is.transferTo(out);
                                 out.closeEntry();
                                 continue;
                             }
 
-                            var serviceName = name.substring(18);
-                            final var nameMatcher = groupPattern.matcher(serviceName);
-                            if (!nameMatcher.find()) {
-                                out.putNextEntry(entry);
-                                is.transferTo(out);
-                                out.closeEntry();
-                                continue;
-                            }
-                            serviceName = nameMatcher.replaceAll(group);
-                            var content = RelocateResourceTask.readBytes(is).toString();
-                            content = groupPattern.matcher(content).replaceAll(group);
+                            if (isService) {
+                                var serviceName = name.substring(18);
+                                final var nameMatcher = groupPattern.matcher(serviceName);
+                                if (!nameMatcher.find()) {
+                                    out.putNextEntry(entry);
+                                    is.transferTo(out);
+                                    out.closeEntry();
+                                    continue;
+                                }
+                                serviceName = nameMatcher.replaceAll(group);
+                                var content = RelocateResourceTask.readBytes(is).toString();
+                                content = groupPattern.matcher(content).replaceAll(group);
 
-                            final var newEntry = new JarEntry("META-INF/services/" + serviceName);
-                            out.putNextEntry(newEntry);
-                            out.write(content.getBytes(StandardCharsets.UTF_8));
-                            out.closeEntry();
+                                final var newEntry = new JarEntry("META-INF/services/" + serviceName);
+                                out.putNextEntry(newEntry);
+                                out.write(content.getBytes(StandardCharsets.UTF_8));
+                                out.closeEntry();
+                            } else {
+                                String content = RelocateResourceTask.readBytes(is).toString();
+                                content = groupPattern.matcher(content).replaceAll(group);
+                                content = groupPatternND.matcher(content).replaceAll(group.replace('.', '/'));
+
+                                final var newEntry = new JarEntry(name);
+                                out.putNextEntry(newEntry);
+                                out.write(content.getBytes(StandardCharsets.UTF_8));
+                                out.closeEntry();
+                            }
                         }
                     }
                 }

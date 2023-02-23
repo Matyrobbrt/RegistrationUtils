@@ -4,6 +4,12 @@ plugins {
     id 'idea'
 }
 
+loom {
+    mixin {
+        it.add('main', 'regutils.refmap.json')
+    }
+}
+
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
     mappings loom.officialMojangMappings()

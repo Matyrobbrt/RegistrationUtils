@@ -54,11 +54,8 @@ public interface DatapackRegistryHelper {
     /**
      * Create and register a new datapack registry.
      *
-     * @param key          the key of the registry. This will be used for determining the path of the registry folder. On Forge,
-     *                     the path will be {@code data/<datapack_namespace>/key_namespace/key_path/}, whereas
-     *                     on Fabric it will be {@code data/<datapack_namespace>/key_path/}, so you should mixin
-     *                     into {@link net.minecraft.resources.RegistryDataLoader#registryDirPath(ResourceLocation)}
-     *                     to make sure your registry's path is the same on Fabric.
+     * @param key          the key of the registry. This will be used for determining the path of the registry folder,
+     *                     which will be {@code data/<datapack_namespace>/key_namespace/key_path/}
      * @param elementCodec the codec used to decode registry elements
      * @param networkCodec the codec used to sync registry elements to clients. If {@code null}, the registry will
      *                     not be synced to clients, so it will not be accessible on the logical client

@@ -37,6 +37,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.RegistrySynchronization;
 import net.minecraft.resources.RegistryDataLoader;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 import sun.misc.Unsafe;
 
@@ -47,9 +48,11 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -64,6 +67,8 @@ public class FabricDatapackRegistryHelper implements DatapackRegistryHelper {
     private static final long offset$WORLDGEN_REGISTRIES;
     private static final long offset$NETWORKABLE_REGISTRIES;
     private static final MethodHandle new$NetworkedRegistryData;
+
+    public static final Set<ResourceLocation> OWNED_REGISTRIES = new HashSet<>();
 
     static {
         try {
@@ -98,6 +103,7 @@ public class FabricDatapackRegistryHelper implements DatapackRegistryHelper {
         try {
             Objects.requireNonNull(key, "registry key must not be null");
             Objects.requireNonNull(elementCodec, "element codec must not be null");
+            OWNED_REGISTRIES.add(key.location());
 
             final List<RegistryDataLoader.RegistryData<?>> mutableCopy = new ArrayList<>(RegistryDataLoader.WORLDGEN_REGISTRIES);
             mutableCopy.add(new RegistryDataLoader.RegistryData<>(

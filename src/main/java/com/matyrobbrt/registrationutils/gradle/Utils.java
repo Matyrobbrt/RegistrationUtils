@@ -31,11 +31,11 @@ package com.matyrobbrt.registrationutils.gradle;
 import java.security.MessageDigest;
 
 public class Utils {
-    private static final char[] HEX = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+    private static final char[] HEX = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
 
     public static String byteArray2Hex(byte[] bytes) {
         StringBuilder sb = new StringBuilder(bytes.length * 2);
-        for(final byte b : bytes) {
+        for (final byte b : bytes) {
             sb.append(HEX[(b & 0xF0) >> 4]);
             sb.append(HEX[b & 0x0F]);
         }
@@ -50,5 +50,18 @@ public class Utils {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static final String POSSIBLE = "0123456789"
+            + "abcdefghijklmnopqrstuvxyz"; // "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    public static String getAlphaNumericString(int n) {
+        final StringBuilder sb = new StringBuilder(n);
+
+        for (int i = 0; i < n; i++) {
+            final int index = (int) (POSSIBLE.length() * Math.random());
+            sb.append(POSSIBLE.charAt(index));
+        }
+
+        return sb.toString();
     }
 }

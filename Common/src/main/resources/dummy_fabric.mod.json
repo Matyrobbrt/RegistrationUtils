@@ -2,5 +2,6 @@
   "schemaVersion": 1,
   "id": "${type}",
   "version": "${version}",
-  "description": "Dummy registration utilities mod. This only appears in a dev environment."
+  "description": "Dummy registration utilities mod. This only appears in a dev environment.",
+  "mixins": ["regutils.mixins.json"]
 }

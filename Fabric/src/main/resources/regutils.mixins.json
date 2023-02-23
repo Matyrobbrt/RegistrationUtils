@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "package": "com.matyrobbrt.registrationutils.fabric.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "RegistryDataLoaderMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "refmap": "regutils.refmap.json"
+}

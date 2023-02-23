@@ -27,7 +27,7 @@ public class RegTest implements ModInitializer {
     public static final RegistryObject<MyObject> SOME_OBJECT = MY_OBJECTS.register("yes", () -> new MyObject(14));
 
     public static final Function<RegistryAccess, Registry<MyObject>> MY_DP_OBJECTS = DatapackRegistryHelper.INSTANCE
-            .createRegistry(ResourceKey.createRegistryKey(new ResourceLocation("regtest", "test_dp")), MyObject.CODEC, null);
+            .createRegistry(ResourceKey.createRegistryKey(new ResourceLocation("regtest", "test_dp")), MyObject.CODEC, MyObject.CODEC);
 
     public record MyObject(int someInt) {
         public static final Codec<MyObject> CODEC = RecordCodecBuilder.create(in -> in.group(
@@ -40,11 +40,11 @@ public class RegTest implements ModInitializer {
         MY_OBJECT_REGISTRY.get().holders().forEach(holder -> System.out.println("Key: " + holder.key().location() + ", value: " + holder.value()));
 
         UseItemCallback.EVENT.register((player, world, hand) -> {
-            System.out.println("Entries: " + MY_DP_OBJECTS.apply(world.registryAccess()).stream().toList());
+            System.out.println("Entries: " + MY_DP_OBJECTS.apply(world.registryAccess()).holders().toList());
             return InteractionResultHolder.pass(player.getItemInHand(hand));
         });
         ClientPickBlockApplyCallback.EVENT.register((player, result, stack) -> {
-            System.out.println("Entries: " + MY_DP_OBJECTS.apply(player.level.registryAccess()).stream().toList());
+            System.out.println("Entries: " + MY_DP_OBJECTS.apply(player.level.registryAccess()).holders().toList());
             return stack;
         });
     }

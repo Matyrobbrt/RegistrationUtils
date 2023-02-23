@@ -81,6 +81,13 @@ public abstract class RelocateResourceTask extends DefaultTask implements Runnab
         try {
             forEachEntry(input, (name, data) -> {
                 final var fileData = FileData.create(name);
+                if (fileData.fileName.equals("regutils.refmap.json")) {
+                    final String str = data.toString();
+                    Files.writeString(output.resolve(fileData.directory.isEmpty() ? fileData.fileName : fileData.directory + "/" + fileData.fileName),
+                            str.replace(fromGroup.replace('.', '/'), toGroup.replace('.', '/')));
+                    return;
+                }
+
                 final var relocatedName = regex.matcher(fileData.fileName()).replaceAll(toGroup);
                 final var pkg = fileData.directory().replace('/', '.');
                 var path = output.resolve(fileData.directory().isEmpty() ? relocatedName : regex.matcher(pkg).replaceAll(toGroup).replace('.', '/') + "/" + relocatedName);
