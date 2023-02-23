@@ -43,6 +43,7 @@ import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModList;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.NewRegistryEvent;
+import org.jetbrains.annotations.ApiStatus;
 
 import javax.annotation.Nonnull;
 import java.util.Collections;
@@ -68,7 +69,8 @@ public class ForgeRegistrationFactory implements RegistrationProvider.Factory {
     }
 
     @Nonnull
-    private static IEventBus getBus(String modId) {
+    @ApiStatus.Internal
+    static IEventBus getBus(String modId) {
         if (modId.equals("minecraft"))
             modId = "forge"; // Defer minecraft namespace to forge bus
         final var containerOpt = ModList.get().getModContainerById(modId);

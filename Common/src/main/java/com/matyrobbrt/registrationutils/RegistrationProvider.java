@@ -29,13 +29,12 @@
 package com.matyrobbrt.registrationutils;
 
 import com.matyrobbrt.registrationutils.registries.RegistryBuilder;
-import net.minecraft.Util;
+import com.matyrobbrt.registrationutils.util.$InternalRegUtils;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.Collection;
-import java.util.ServiceLoader;
 import java.util.function.Supplier;
 
 /**
@@ -153,19 +152,7 @@ public interface RegistrationProvider<T> {
         /**
          * The singleton instance of the {@link Factory}. This is different on each loader.
          */
-        Factory INSTANCE = Util.make(() -> {
-            final var loader = ServiceLoader.load(Factory.class);
-            final var it = loader.iterator();
-            if (!it.hasNext()) {
-                throw new RuntimeException("No RegistrationProvider Factory was found on the classpath!");
-            } else {
-                final Factory factory = it.next();
-                if (it.hasNext()) {
-                    throw new RuntimeException("More than one RegistrationProvider Factory was found on the classpath!");
-                }
-                return factory;
-            }
-        });
+        Factory INSTANCE = $InternalRegUtils.getOneAndOnlyService(Factory.class);
 
         /**
          * Creates a {@link RegistrationProvider}.
