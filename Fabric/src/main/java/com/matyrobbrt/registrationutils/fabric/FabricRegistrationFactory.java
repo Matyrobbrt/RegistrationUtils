@@ -28,6 +28,7 @@
 
 package com.matyrobbrt.registrationutils.fabric;
 
+import com.google.auto.service.AutoService;
 import com.google.common.base.Suppliers;
 import com.matyrobbrt.registrationutils.RegistrationProvider;
 import com.matyrobbrt.registrationutils.RegistryObject;
@@ -53,6 +54,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
+@AutoService(RegistrationProvider.Factory.class)
 public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
     @Override
