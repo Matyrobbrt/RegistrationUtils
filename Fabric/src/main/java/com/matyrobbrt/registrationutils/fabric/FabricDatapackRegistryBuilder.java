@@ -30,14 +30,21 @@ package com.matyrobbrt.registrationutils.fabric;
 
 import com.google.auto.service.AutoService;
 import com.google.common.collect.ImmutableMap;
-import com.matyrobbrt.registrationutils.registries.DatapackRegistryHelper;
+import com.matyrobbrt.registrationutils.registries.DatapackRegistry;
+import com.matyrobbrt.registrationutils.registries.DatapackRegistryBuilder;
+import com.matyrobbrt.registrationutils.util.DatapackRegistryGenerator;
 import com.mojang.serialization.Codec;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.RegistrySetBuilder;
 import net.minecraft.core.RegistrySynchronization;
+import net.minecraft.data.DataProvider;
+import net.minecraft.data.registries.VanillaRegistries;
 import net.minecraft.resources.RegistryDataLoader;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import sun.misc.Unsafe;
 
@@ -53,12 +60,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
 @ParametersAreNonnullByDefault
-@AutoService(DatapackRegistryHelper.class)
-public class FabricDatapackRegistryHelper implements DatapackRegistryHelper {
+public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder<T> {
     private static final Unsafe UNSAFE;
     private static final MethodHandles.Lookup IMPL_LOOKUP;
 
@@ -66,6 +72,7 @@ public class FabricDatapackRegistryHelper implements DatapackRegistryHelper {
     private static final Field NETWORKABLE_REGISTRIES;
     private static final long offset$WORLDGEN_REGISTRIES;
     private static final long offset$NETWORKABLE_REGISTRIES;
+    private static final long offset$VANILLA_REGISTRIES;
     private static final MethodHandle new$NetworkedRegistryData;
 
     public static final Set<ResourceLocation> OWNED_REGISTRIES = new HashSet<>();
@@ -89,6 +96,9 @@ public class FabricDatapackRegistryHelper implements DatapackRegistryHelper {
                     .filter(it -> it.getType() == Map.class).findFirst().orElseThrow();
             offset$NETWORKABLE_REGISTRIES = UNSAFE.staticFieldOffset(NETWORKABLE_REGISTRIES);
 
+            offset$VANILLA_REGISTRIES = UNSAFE.staticFieldOffset(Stream.of(VanillaRegistries.class.getDeclaredFields())
+                    .filter(it -> it.getType() == RegistrySetBuilder.class).findFirst().orElseThrow());
+
             final Class<?> networkedRegistryData = Stream.of(RegistrySynchronization.class.getDeclaredClasses())
                     .filter(Class::isRecord).findFirst().orElseThrow();
             new$NetworkedRegistryData = IMPL_LOOKUP.findConstructor(networkedRegistryData, MethodType.methodType(void.class, ResourceKey.class, Codec.class));
@@ -97,14 +107,41 @@ public class FabricDatapackRegistryHelper implements DatapackRegistryHelper {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    @Override
-    public <T> Function<RegistryAccess, Registry<T>> createRegistry(ResourceKey<Registry<T>> key, Codec<T> elementCodec, @Nullable Codec<T> networkCodec) {
-        try {
-            Objects.requireNonNull(key, "registry key must not be null");
-            Objects.requireNonNull(elementCodec, "element codec must not be null");
-            OWNED_REGISTRIES.add(key.location());
+    private final ResourceKey<Registry<T>> key;
+    private Codec<T> elementCodec;
+    private @Nullable Codec<T> networkCodec;
+    private @Nullable RegistrySetBuilder.RegistryBootstrap<T> bootstrap;
 
+    private FabricDatapackRegistryBuilder(ResourceKey<Registry<T>> key) {
+        this.key = Objects.requireNonNull(key, "registry key must not be null");
+    }
+
+    @Override
+    public DatapackRegistryBuilder<T> withElementCodec(@NotNull Codec<T> codec) {
+        this.elementCodec = Objects.requireNonNull(codec, "element codec must not be null");
+        return this;
+    }
+
+    @Override
+    public DatapackRegistryBuilder<T> withNetworkCodec(@Nullable Codec<T> codec) {
+        this.networkCodec = codec;
+        return this;
+    }
+
+    @Override
+    public DatapackRegistryBuilder<T> withBootstrap(@Nullable RegistrySetBuilder.RegistryBootstrap<T> bootstrap) {
+        this.bootstrap = bootstrap;
+        return this;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public DatapackRegistry<T> build() {
+        Objects.requireNonNull(elementCodec, "element codec must not be null");
+
+        OWNED_REGISTRIES.add(key.location());
+
+        try {
             final List<RegistryDataLoader.RegistryData<?>> mutableCopy = new ArrayList<>(RegistryDataLoader.WORLDGEN_REGISTRIES);
             mutableCopy.add(new RegistryDataLoader.RegistryData<>(
                     key, elementCodec
@@ -125,10 +162,36 @@ public class FabricDatapackRegistryHelper implements DatapackRegistryHelper {
                 builder.put(key, data);
                 UNSAFE.putObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES, builder.build());
             }
-        } catch (Throwable ex) {
-            throw new RuntimeException("Could not register datapack registry: ", ex);
+
+            if (bootstrap != null) {
+                RegistrySetBuilder builder = (RegistrySetBuilder) UNSAFE.getObject(VanillaRegistries.class, offset$VANILLA_REGISTRIES);
+                if (builder == null) {
+                    UNSAFE.allocateInstance(VanillaRegistries.class);
+                    builder = (RegistrySetBuilder) UNSAFE.getObject(VanillaRegistries.class, offset$VANILLA_REGISTRIES);
+                }
+
+                builder.add(key, bootstrap);
+            }
+        } catch (Throwable throwable) {
+            throw new RuntimeException("Could not register datapack registry: ", throwable);
         }
-        return registryAccess -> registryAccess.registryOrThrow(key);
+
+        return new DatapackRegistry<>() {
+            @Override
+            public ResourceKey<Registry<T>> key() {
+                return key;
+            }
+
+            @Override
+            public DataProvider.Factory<DataProvider> bootstrapDataGenerator(CompletableFuture<HolderLookup.Provider> lookupProvider) {
+                return packOutput -> new DatapackRegistryGenerator(packOutput, lookupProvider, registryData -> registryData.key() == key());
+            }
+
+            @Override
+            public Registry<T> get(RegistryAccess registryAccess) {
+                return registryAccess.registryOrThrow(key);
+            }
+        };
     }
 
     private static Object getStaticOrNull(Field field) {
@@ -136,6 +199,15 @@ public class FabricDatapackRegistryHelper implements DatapackRegistryHelper {
             return field.get(null);
         } catch (IllegalAccessException e) {
             return null;
+        }
+    }
+
+    @AutoService($Factory.class)
+    public static final class Factory implements $Factory {
+
+        @Override
+        public <T> DatapackRegistryBuilder<T> newBuilder(ResourceKey<Registry<T>> key) {
+            return new FabricDatapackRegistryBuilder<>(key);
         }
     }
 }
