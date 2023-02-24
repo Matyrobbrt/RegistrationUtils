@@ -68,10 +68,10 @@ public interface DatapackRegistryBuilder<T> {
 
     /**
      * Sets the datagen {@link net.minecraft.core.RegistrySetBuilder.RegistryBootstrap} for this registry. <br>
-     * The bootstrap will be injected into {@link net.minecraft.data.registries.VanillaRegistries#BUILDER}.
      *
      * @param bootstrap the datagen registry bootstrap
      * @see DatapackRegistry#bootstrapDataGenerator(CompletableFuture)
+     * @see DatapackRegistry#addToSet(RegistrySetBuilder)
      * @return the builder instance
      */
     DatapackRegistryBuilder<T> withBootstrap(@Nullable RegistrySetBuilder.RegistryBootstrap<T> bootstrap);
