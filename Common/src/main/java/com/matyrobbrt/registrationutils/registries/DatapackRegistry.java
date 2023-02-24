@@ -32,8 +32,9 @@ import net.minecraft.Util;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.RegistrySetBuilder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.data.DataProvider;
-import net.minecraft.data.registries.VanillaRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 
@@ -82,11 +83,21 @@ public interface DatapackRegistry<T> {
     DataProvider.Factory<DataProvider> bootstrapDataGenerator(CompletableFuture<HolderLookup.Provider> lookupProvider);
 
     /**
-     * {@return a DataProvider factory that generates the bootstrap entries of this datapack registry from {@link VanillaRegistries#createLookup()}}
+     * {@return a DataProvider factory that generates the bootstrap entries of this datapack registry from a set to which entries have been added via {@link #addToSet(RegistrySetBuilder)}}
      */
     default DataProvider.Factory<DataProvider> bootstrapDataGenerator() {
-        return bootstrapDataGenerator(CompletableFuture.supplyAsync(VanillaRegistries::createLookup, Util.backgroundExecutor()));
+        return bootstrapDataGenerator(CompletableFuture.supplyAsync(() -> {
+            final RegistryAccess.Frozen access = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+            final RegistrySetBuilder builder = new RegistrySetBuilder();
+            addToSet(builder);
+            return builder.build(access);
+        }, Util.backgroundExecutor()));
     }
+
+    /**
+     * Adds this registry and its bootstrap to the {@code builder}.
+     */
+    void addToSet(RegistrySetBuilder builder);
 
     /**
      * Gets the registry from the given {@code registryAccess}.

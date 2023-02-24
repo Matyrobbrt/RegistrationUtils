@@ -72,7 +72,6 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
     private static final Field NETWORKABLE_REGISTRIES;
     private static final long offset$WORLDGEN_REGISTRIES;
     private static final long offset$NETWORKABLE_REGISTRIES;
-    private static final long offset$VANILLA_REGISTRIES;
     private static final MethodHandle new$NetworkedRegistryData;
 
     public static final Set<ResourceLocation> OWNED_REGISTRIES = new HashSet<>();
@@ -95,9 +94,6 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
             NETWORKABLE_REGISTRIES = Stream.of(RegistrySynchronization.class.getDeclaredFields())
                     .filter(it -> it.getType() == Map.class).findFirst().orElseThrow();
             offset$NETWORKABLE_REGISTRIES = UNSAFE.staticFieldOffset(NETWORKABLE_REGISTRIES);
-
-            offset$VANILLA_REGISTRIES = UNSAFE.staticFieldOffset(Stream.of(VanillaRegistries.class.getDeclaredFields())
-                    .filter(it -> it.getType() == RegistrySetBuilder.class).findFirst().orElseThrow());
 
             final Class<?> networkedRegistryData = Stream.of(RegistrySynchronization.class.getDeclaredClasses())
                     .filter(Class::isRecord).findFirst().orElseThrow();
@@ -162,16 +158,6 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
                 builder.put(key, data);
                 UNSAFE.putObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES, builder.build());
             }
-
-            if (bootstrap != null) {
-                RegistrySetBuilder builder = (RegistrySetBuilder) UNSAFE.getObject(VanillaRegistries.class, offset$VANILLA_REGISTRIES);
-                if (builder == null) {
-                    UNSAFE.allocateInstance(VanillaRegistries.class);
-                    builder = (RegistrySetBuilder) UNSAFE.getObject(VanillaRegistries.class, offset$VANILLA_REGISTRIES);
-                }
-
-                builder.add(key, bootstrap);
-            }
         } catch (Throwable throwable) {
             throw new RuntimeException("Could not register datapack registry: ", throwable);
         }
@@ -185,6 +171,11 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
             @Override
             public DataProvider.Factory<DataProvider> bootstrapDataGenerator(CompletableFuture<HolderLookup.Provider> lookupProvider) {
                 return packOutput -> new DatapackRegistryGenerator(packOutput, lookupProvider, registryData -> registryData.key() == key());
+            }
+
+            @Override
+            public void addToSet(RegistrySetBuilder builder) {
+                builder.add(key, bootstrap == null ? ctx -> {} : bootstrap);
             }
 
             @Override

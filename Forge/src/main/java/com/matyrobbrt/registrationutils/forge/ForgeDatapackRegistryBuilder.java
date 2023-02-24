@@ -101,20 +101,6 @@ public class ForgeDatapackRegistryBuilder<T> implements DatapackRegistryBuilder<
         final IEventBus bus = ForgeRegistrationFactory.getBus(key.location().getNamespace());
         bus.addListener((final DataPackRegistryEvent.NewRegistry event) -> event.dataPackRegistry(key, Objects.requireNonNull(elementCodec, "element codec must not be null"), networkCodec));
 
-        try {
-            if (bootstrap != null) {
-                RegistrySetBuilder builder = (RegistrySetBuilder) UNSAFE.getObject(VanillaRegistries.class, offset$VANILLA_REGISTRIES);
-                if (builder == null) {
-                    UNSAFE.allocateInstance(VanillaRegistries.class);
-                    builder = (RegistrySetBuilder) UNSAFE.getObject(VanillaRegistries.class, offset$VANILLA_REGISTRIES);
-                }
-
-                builder.add(key, bootstrap);
-            }
-        } catch (Throwable ex) {
-            throw new RuntimeException("Could not register dapatack registry: ", ex);
-        }
-
         return new DatapackRegistry<>() {
             @Override
             public ResourceKey<Registry<T>> key() {
@@ -124,6 +110,11 @@ public class ForgeDatapackRegistryBuilder<T> implements DatapackRegistryBuilder<
             @Override
             public DataProvider.Factory<DataProvider> bootstrapDataGenerator(CompletableFuture<HolderLookup.Provider> lookupProvider) {
                 return out -> new DatapackRegistryGenerator(out, lookupProvider, registryData -> registryData.key() == key());
+            }
+
+            @Override
+            public void addToSet(RegistrySetBuilder builder) {
+                builder.add(key, bootstrap == null ? ctx -> {} : bootstrap);
             }
 
             @Override
