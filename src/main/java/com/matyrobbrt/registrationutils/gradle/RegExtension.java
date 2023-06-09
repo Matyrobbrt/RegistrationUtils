@@ -28,6 +28,7 @@
 
 package com.matyrobbrt.registrationutils.gradle;
 
+import com.google.common.collect.Lists;
 import com.matyrobbrt.registrationutils.gradle.holderreg.HolderScanner;
 import com.matyrobbrt.registrationutils.gradle.task.RelocateResourceTask;
 import groovy.json.JsonGenerator;
@@ -38,6 +39,7 @@ import net.minecraftforge.artifactural.api.artifact.ArtifactIdentifier;
 import net.minecraftforge.artifactural.base.repository.ArtifactProviderBuilder;
 import net.minecraftforge.artifactural.base.repository.SimpleRepository;
 import net.minecraftforge.artifactural.gradle.GradleRepositoryAdapter;
+import org.apache.commons.io.IOUtils;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
@@ -65,6 +67,8 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -87,6 +91,7 @@ import java.util.function.Predicate;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -118,13 +123,13 @@ public class RegExtension {
                 .resolve(Utils.getStringFromSHA256(group)).toAbsolutePath();
 
         int random = ThreadLocalRandom.current().nextInt();
-        final var cache = cachePath.resolve("cache");
-        final var provider = new RegArtifactProvider(group, cachePath);
+        final Path cache = cachePath.resolve("cache");
+        final RegArtifactProvider provider = new RegArtifactProvider(group, cachePath);
         GradleRepositoryAdapter.add(project.getRepositories(), "reg_" + random, cache.toFile(),
                 SimpleRepository.of(ArtifactProviderBuilder.begin(ArtifactIdentifier.class).provide(provider))
         );
 
-        final var type = config.type.get().toString();
+        final String type = config.type.get().toString();
         commonSourcesIn = cachePath.resolve("sources").resolve(RegistrationUtilsPlugin.VERSION).resolve("common").toAbsolutePath();
         typeSourcesIn = cachePath.resolve("sources").resolve(RegistrationUtilsPlugin.VERSION).resolve(type).toAbsolutePath();
 
@@ -147,7 +152,7 @@ public class RegExtension {
                 }
             }));
         }
-        final var internal = (ProjectInternal) ProjectBuilder.builder()
+        final ProjectInternal internal = (ProjectInternal) ProjectBuilder.builder()
                 .withName("reg_" + project.getName())
                 .withProjectDir(cachePath.resolve("projects").resolve(project.getName()).toFile())
                 .build();
@@ -179,19 +184,20 @@ public class RegExtension {
 
     public void configureJarTask(Object task, @Nullable String classifier) {
         AbstractCopyTask tsk;
-        if (task instanceof String str) {
-            final var maybeTask = project.getTasks().getByName(str);
-            if (maybeTask instanceof AbstractCopyTask asb) {
-                tsk = asb;
+        if (task instanceof String) {
+            final String str = (String) task;
+            final Task maybeTask = project.getTasks().getByName(str);
+            if (maybeTask instanceof AbstractCopyTask) {
+                tsk = (AbstractCopyTask) maybeTask;
             } else
                 throw new RuntimeException("Cannot configure task of type " + maybeTask + " in order to include Reg");
-        } else if (task instanceof AbstractCopyTask asb) {
-            tsk = asb;
+        } else if (task instanceof AbstractCopyTask) {
+            tsk = (AbstractCopyTask) task;
         } else {
             throw new RuntimeException("Cannot find task " + task);
         }
         try {
-            final var extDir = cachePath.resolve("ext_" + tsk.getName()).resolve(RegistrationUtilsPlugin.VERSION).resolve(config.type.get().toString());
+            final Path extDir = cachePath.resolve("ext_" + tsk.getName()).resolve(RegistrationUtilsPlugin.VERSION).resolve(config.type.get().toString());
             deleteDir(extDir);
             Files.createDirectories(extDir.getParent());
             // TODO find a better solution here
@@ -215,7 +221,8 @@ public class RegExtension {
                 }
             });
 
-            if (config.type.get() == RegistrationUtilsExtension.SubProject.Type.FABRIC && tsk instanceof final AbstractArchiveTask jar) {
+            if (config.type.get() == RegistrationUtilsExtension.SubProject.Type.FABRIC && tsk instanceof AbstractArchiveTask) {
+                final AbstractArchiveTask jar = (AbstractArchiveTask) tsk;
                 final String configName = "regutils-" + Utils.getAlphaNumericString(7) + "-" + group.replace('.', '-');
                 final String mixinsConfig = configName + ".mixins.json";
                 tsk.from(extDir, spec -> spec.rename("regutils.mixins.json", mixinsConfig)
@@ -225,35 +232,35 @@ public class RegExtension {
                     @Override
                     @SuppressWarnings({"rawtypes", "unchecked"})
                     public void execute(Task task) {
-                        try (final FileSystem fs = FileSystems.newFileSystem(jar.getArchiveFile().get().getAsFile().toPath())) {
+                        try (final FileSystem fs = FileSystems.newFileSystem(jar.getArchiveFile().get().getAsFile().toPath(), (ClassLoader) null)) {
                             final Path configPath = fs.getPath(mixinsConfig);
                             if (Files.exists(configPath)) {
-                                final String str = Files.readString(configPath);
-                                Files.writeString(configPath, str.replace("regutils.refmap.json", configName + ".refmap.json"));
+                                final String str = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
+                                Files.write(configPath, str.replace("regutils.refmap.json", configName + ".refmap.json").getBytes(StandardCharsets.UTF_8));
                             }
 
                             final Path fmj = fs.getPath("fabric.mod.json");
                             if (Files.exists(fmj)) {
                                 final Map map = (Map) PARSER.parse(fmj);
                                 final Object mixins = map.computeIfAbsent("mixins", o -> new ArrayList<>());
-                                if (mixins instanceof List list) {
-                                    list.add(mixinsConfig);
+                                if (mixins instanceof List) {
+                                    ((List) mixins).add(mixinsConfig);
                                 } else {
-                                    map.put("mixins", List.of(mixins, mixinsConfig));
+                                    map.put("mixins", Lists.newArrayList(mixins, mixinsConfig));
                                 }
-                                Files.writeString(fmj, GENERATOR.toJson(map));
+                                Files.write(fmj, GENERATOR.toJson(map).getBytes(StandardCharsets.UTF_8));
                             }
 
                             final Path qmj = fs.getPath("quilt.mod.json");
                             if (Files.exists(qmj)) {
                                 final Map map = (Map) PARSER.parse(qmj);
                                 final Object mixins = map.computeIfAbsent("mixin", o -> new ArrayList<>());
-                                if (mixins instanceof List list) {
-                                    list.add(mixinsConfig);
+                                if (mixins instanceof List) {
+                                    ((List) mixins).add(mixinsConfig);
                                 } else {
-                                    map.put("mixin", List.of(mixins, mixinsConfig));
+                                    map.put("mixin", Lists.newArrayList(mixins, mixinsConfig));
                                 }
-                                Files.writeString(qmj, GENERATOR.toJson(map));
+                                Files.write(qmj, GENERATOR.toJson(map).getBytes(StandardCharsets.UTF_8));
                             }
                         } catch (IOException e) {
                             throw new RuntimeException(e);
@@ -281,11 +288,11 @@ public class RegExtension {
                 // Make sure we want the file
                 if (predicate.test(entry.getName()) && !entry.isDirectory()) {
                     // Create the file
-                    final var is = file.getInputStream(entry);
+                    final InputStream is = file.getInputStream(entry);
                     final BufferedInputStream bis = new BufferedInputStream(is);
                     final Path uncompressedFilePath = outputPath.resolve(entry.getName());
                     Files.createDirectories(uncompressedFilePath.getParent());
-                    final var fileOutput = Files.newOutputStream(uncompressedFilePath);
+                    final OutputStream fileOutput = Files.newOutputStream(uncompressedFilePath);
                     while (bis.available() > 0) {
                         fileOutput.write(bis.read());
                     }
@@ -297,33 +304,33 @@ public class RegExtension {
 
     @SuppressWarnings("ALL")
     public Dependency common() {
-        final var dep = project.getDependencies().create(dependencyNotation(null));
+        final Dependency dep = project.getDependencies().create(dependencyNotation(null));
         maybeCreateJar(null, commonSourcesIn, "common", "com.matyrobbrt.registrationutils", commonSourcesJar);
         return dep;
     }
 
     @SuppressWarnings("ALL")
     public Dependency loaderSpecific() {
-        final var type = config.type.get();
+        final RegistrationUtilsExtension.SubProject.Type type = config.type.get();
         if (type == RegistrationUtilsExtension.SubProject.Type.COMMON)
             return common();
-        final var dep = project.getDependencies().create(dependencyNotation(type));
+        final Dependency dep = project.getDependencies().create(dependencyNotation(type));
         maybeCreateJar(type, typeSourcesIn, type.toString(), "com.matyrobbrt.registrationutils", typeSourcesJar);
         return dep;
     }
 
     @SuppressWarnings("unused")
     public Dependency joined() {
-        final var type = config.type.get();
+        final RegistrationUtilsExtension.SubProject.Type type = config.type.get();
         if (type == RegistrationUtilsExtension.SubProject.Type.COMMON)
             return common();
 
-        final var dep = project.getDependencies().create(group + ":" + JAR_NAME + "-joined-" + type + ":" + RegistrationUtilsPlugin.VERSION);
+        final Dependency dep = project.getDependencies().create(group + ":" + JAR_NAME + "-joined-" + type + ":" + RegistrationUtilsPlugin.VERSION);
         common(); // Make sure common exists
-        final var commonJarPath = getJarPath(null, null);
+        final Path commonJarPath = getJarPath(null, null);
         loaderSpecific(); // Make sure type exists
-        final var typeJarPath = getJarPath(type, null);
-        final var outPath = cachePath.resolve(JAR_NAME + "-joined-" + type + "-" + RegistrationUtilsPlugin.VERSION + ".jar");
+        final Path typeJarPath = getJarPath(type, null);
+        final Path outPath = cachePath.resolve(JAR_NAME + "-joined-" + type + "-" + RegistrationUtilsPlugin.VERSION + ".jar");
 
         if (Files.exists(outPath) && !(project.hasProperty(FORCE_GENERATION_PROPERTY) || project.getGradle().getStartParameter().isRefreshDependencies())) {
             return dep;
@@ -332,9 +339,9 @@ public class RegExtension {
         try {
             Files.deleteIfExists(outPath);
             Files.createFile(outPath);
-            try (final var commonJar = new JarFile(commonJarPath.toFile());
-                 final var typeJar = new JarFile(typeJarPath.toFile());
-                 final var out = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(outPath.toFile())))) {
+            try (final JarFile commonJar = new JarFile(commonJarPath.toFile());
+                 final JarFile typeJar = new JarFile(typeJarPath.toFile());
+                 final JarOutputStream out = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(outPath.toFile())))) {
                 copyEntries(null, commonJar, out);
                 copyEntries(commonJar, typeJar, out);
             }
@@ -346,12 +353,12 @@ public class RegExtension {
 
     @ParametersAreNonnullByDefault
     private static void copyEntries(@Nullable JarFile other, JarFile in, JarOutputStream out) throws IOException {
-        for (final var entries = in.entries(); entries.hasMoreElements(); ) {
-            final var entry = entries.nextElement();
+        for (final Enumeration<JarEntry> entries = in.entries(); entries.hasMoreElements(); ) {
+            final JarEntry entry = entries.nextElement();
             if (other == null || other.getEntry(entry.getName()) == null) {
                 // Doesn't exist already
                 out.putNextEntry(entry);
-                in.getInputStream(entry).transferTo(out);
+                IOUtils.copy(in.getInputStream(entry), out);
                 out.closeEntry();
             }
         }
@@ -368,7 +375,7 @@ public class RegExtension {
             String inGroup,
             @Nullable JarTask sourcesJarTask
     ) {
-        final var jarPath = getJarPath(type, null);
+        final Path jarPath = getJarPath(type, null);
         if (Files.exists(jarPath) && !(project.hasProperty(FORCE_GENERATION_PROPERTY) || project.getGradle().getStartParameter().isRefreshDependencies())) {
             attachSources(type);
             return jarPath;
@@ -382,7 +389,7 @@ public class RegExtension {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            final var res = RelocateResourceTask.relocate(
+            final boolean res = RelocateResourceTask.relocate(
                     project.getLogger(),
                     RelocateResourceTask.getResourceDir(resource + "-sources.zip"),
                     sourcesInPath,
@@ -397,51 +404,51 @@ public class RegExtension {
         {
             try {
                 final String jarName = (type == null ? "common" : type.toString()) + "-" + RegistrationUtilsPlugin.VERSION + ".jar";
-                final var finishedTemp = cachePath.resolve("comp").resolve(jarName);
+                final Path finishedTemp = cachePath.resolve("comp").resolve(jarName);
                 Files.createDirectories(finishedTemp.getParent());
                 Files.deleteIfExists(finishedTemp);
-                final var jar = cachePath.resolve("befcompiled").resolve(jarName);
+                final Path jar = cachePath.resolve("befcompiled").resolve(jarName);
                 Files.createDirectories(jar.getParent());
                 Files.deleteIfExists(jar);
                 Files.copy(Objects.requireNonNull(RegistrationUtilsExtension.class.getResourceAsStream("/" + resource + ".zip")), jar, StandardCopyOption.REPLACE_EXISTING);
-                final var relocator = new JarRelocator(jar.toFile(), finishedTemp.toFile(), Collections.singleton(new Relocation(inGroup, group)));
+                final JarRelocator relocator = new JarRelocator(jar.toFile(), finishedTemp.toFile(), Collections.singleton(new Relocation(inGroup, group)));
                 relocator.run();
 
-                final var groupPattern = Pattern.compile(inGroup.replace(".", "\\."));
-                final var groupPatternND = Pattern.compile(inGroup.replace('.', '/'));
+                final Pattern groupPattern = Pattern.compile(inGroup.replace(".", "\\."));
+                final Pattern groupPatternND = Pattern.compile(inGroup.replace('.', '/'));
 
                 // Now we gotta rename META-INFs or (mixin) jsons
                 try (JarOutputStream out = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(jarPath.toFile())))) {
                     try (JarFile in = new JarFile(finishedTemp.toFile())) {
                         for (Enumeration<JarEntry> entries = in.entries(); entries.hasMoreElements(); ) {
-                            final var entry = entries.nextElement();
+                            final JarEntry entry = entries.nextElement();
 
-                            final var name = entry.getName();
-                            final var is = in.getInputStream(entry);
+                            final String name = entry.getName();
+                            final InputStream is = in.getInputStream(entry);
 
                             final boolean isService = name.startsWith("META-INF/services/");
                             final boolean isJson = name.endsWith(".json");
                             if (!(isService || isJson) || entry.isDirectory()) {
                                 out.putNextEntry(entry);
-                                is.transferTo(out);
+                                IOUtils.copy(is, out);
                                 out.closeEntry();
                                 continue;
                             }
 
                             if (isService) {
-                                var serviceName = name.substring(18);
-                                final var nameMatcher = groupPattern.matcher(serviceName);
+                                String serviceName = name.substring(18);
+                                final Matcher nameMatcher = groupPattern.matcher(serviceName);
                                 if (!nameMatcher.find()) {
                                     out.putNextEntry(entry);
-                                    is.transferTo(out);
+                                    IOUtils.copy(is, out);
                                     out.closeEntry();
                                     continue;
                                 }
                                 serviceName = nameMatcher.replaceAll(group);
-                                var content = RelocateResourceTask.readBytes(is).toString();
+                                String content = RelocateResourceTask.readBytes(is).toString();
                                 content = groupPattern.matcher(content).replaceAll(group);
 
-                                final var newEntry = new JarEntry("META-INF/services/" + serviceName);
+                                final JarEntry newEntry = new JarEntry("META-INF/services/" + serviceName);
                                 out.putNextEntry(newEntry);
                                 out.write(content.getBytes(StandardCharsets.UTF_8));
                                 out.closeEntry();
@@ -450,7 +457,7 @@ public class RegExtension {
                                 content = groupPattern.matcher(content).replaceAll(group);
                                 content = groupPatternND.matcher(content).replaceAll(group.replace('.', '/'));
 
-                                final var newEntry = new JarEntry(name);
+                                final JarEntry newEntry = new JarEntry(name);
                                 out.putNextEntry(newEntry);
                                 out.write(content.getBytes(StandardCharsets.UTF_8));
                                 out.closeEntry();
@@ -475,11 +482,11 @@ public class RegExtension {
     }
 
     private void attachSources(RegistrationUtilsExtension.SubProject.Type type) {
-        final var jarName = cachePath.relativize(getJarPath(type, null)).toString();
-        final var sourcesJar = getJarPath(type, "sources").toAbsolutePath();
+        final String jarName = cachePath.relativize(getJarPath(type, null)).toString();
+        final Path sourcesJar = getJarPath(type, "sources").toAbsolutePath();
 
         if (project.getPlugins().hasPlugin("eclipse")) {
-            final var eclipse = project.getExtensions().getByType(EclipseModel.class);
+            final EclipseModel eclipse = project.getExtensions().getByType(EclipseModel.class);
             eclipse.classpath(cp -> cp.file(file -> file.whenMerged((Classpath classpath) -> classpath.getEntries().stream()
                     .filter(Library.class::isInstance)
                     .map(Library.class::cast)
@@ -490,7 +497,7 @@ public class RegExtension {
         }
 
         if (project.getPlugins().hasPlugin("idea")) {
-            final var idea = project.getPlugins().getPlugin(IdeaPlugin.class);
+            final IdeaPlugin idea = project.getPlugins().getPlugin(IdeaPlugin.class);
             idea.getModel().module(mod -> mod.iml(iml -> iml.whenMerged($ -> idea.getModel().getModule().resolveDependencies()
                     .stream()
                     .filter(ModuleLibrary.class::isInstance)
@@ -511,7 +518,7 @@ public class RegExtension {
     }
 
     public Path getJarPath(RegistrationUtilsExtension.SubProject.Type type, String classifier) {
-        String actualClassifier = classifier == null || classifier.isBlank() ? "" : "-" + classifier;
+        String actualClassifier = classifier == null || classifier.isEmpty() ? "" : "-" + classifier;
         if (type == null || type == RegistrationUtilsExtension.SubProject.Type.COMMON) {
             return cachePath.resolve(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION + actualClassifier + ".jar");
         } else {
@@ -520,12 +527,12 @@ public class RegExtension {
     }
 
     private void handleTransformation(Path classesOut) {
-        final var mainClassName = config.mainClass.get();
-        final var mainClassP = mainClassName.replace('.', '/') + ".class";
-        final var mainClassOut = classesOut.resolve(mainClassP).toAbsolutePath();
-        final var scanner = new HolderScanner(project.getLogger(), group);
+        final String mainClassName = config.mainClass.get();
+        final String mainClassP = mainClassName.replace('.', '/') + ".class";
+        final Path mainClassOut = classesOut.resolve(mainClassP).toAbsolutePath();
+        final HolderScanner scanner = new HolderScanner(project.getLogger(), group);
         try {
-            Files.walkFileTree(classesOut, new SimpleFileVisitor<>() {
+            Files.walkFileTree(classesOut, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                     file = file.toAbsolutePath();
@@ -539,7 +546,7 @@ public class RegExtension {
             });
 
             // Let's add stuff to meta-inf
-            final var servicesFile = classesOut.resolve("META-INF/services/" + (group.length() < 1 ? "" : group + ".") + "RegistryHolder");
+            final Path servicesFile = classesOut.resolve("META-INF/services/" + (group.length() < 1 ? "" : group + ".") + "RegistryHolder");
             Files.deleteIfExists(servicesFile);
             Files.createDirectories(servicesFile.getParent());
             Files.write(servicesFile.toAbsolutePath(), scanner.getFoundClasses());
@@ -548,11 +555,11 @@ public class RegExtension {
             if (!Files.exists(mainClassOut)) {
                 throw new RuntimeException("Could not find main class " + mainClassName);
             }
-            final var cr = new ClassReader(Files.readAllBytes(mainClassOut));
+            final ClassReader cr = new ClassReader(Files.readAllBytes(mainClassOut));
             final ClassNode clazz = new ClassNode(Opcodes.ASM9);
             cr.accept(clazz, 0);
             if (config.type.get().mainClassHolderTransformer.transform(clazz, config.modInitMethod.get(), group)) {
-                final var cw = new ClassWriter(Opcodes.ASM9);
+                final ClassWriter cw = new ClassWriter(Opcodes.ASM9);
                 clazz.accept(cw);
                 project.getLogger().trace("Transforming main mod class {}: adding registry class static init in mod initialization", clazz.name);
                 Files.write(mainClassOut, cw.toByteArray());

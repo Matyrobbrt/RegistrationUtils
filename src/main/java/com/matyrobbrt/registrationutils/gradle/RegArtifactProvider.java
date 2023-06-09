@@ -37,7 +37,14 @@ import net.minecraftforge.artifactural.base.artifact.StreamableArtifact;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-public record RegArtifactProvider(String group, Path dir) implements ArtifactProvider<ArtifactIdentifier> {
+public final class RegArtifactProvider implements ArtifactProvider<ArtifactIdentifier> {
+    private final String group;
+    private final Path dir;
+
+    public RegArtifactProvider(String group, Path dir) {
+        this.group = group;
+        this.dir = dir;
+    }
 
     @Override
     public Artifact getArtifact(ArtifactIdentifier info) {

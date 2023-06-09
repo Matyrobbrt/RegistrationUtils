@@ -33,6 +33,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 
 import java.util.Locale;
+import java.util.Optional;
 import java.util.stream.StreamSupport;
 
 // TODO this could be done such way that there could be multiple transformers
@@ -44,15 +45,20 @@ public interface MainClassHolderTransformer {
 
     boolean transform(ClassNode clazz, String initMethod, String group);
 
-    record LoadAllHolders(String defaultMethod) implements MainClassHolderTransformer {
+    final class LoadAllHolders implements MainClassHolderTransformer {
+        private final String defaultMethod;
+
+        public LoadAllHolders(String defaultMethod) {
+            this.defaultMethod = defaultMethod;
+        }
 
         @Override
         public boolean transform(ClassNode clazz, String initMethod, String group) {
-            final var type = group.replace('.', '/') + "/RegistryHolder";
+            final String type = group.replace('.', '/') + "/RegistryHolder";
             return clazz.methods
                     .stream()
                     .filter(n -> {
-                        final var fullMethod = n.name + n.desc;
+                        final String fullMethod = n.name + n.desc;
                         if (initMethod.toLowerCase(Locale.ROOT).equals(COMPUTE_FLAG)) {
                             return fullMethod.equals(defaultMethod);
                         } else {
@@ -60,16 +66,20 @@ public interface MainClassHolderTransformer {
                         }
                     })
                     .map(mthd -> {
-                        final var newInsn = new MethodInsnNode(Opcodes.INVOKESTATIC, type, LOAD_ALL_METHOD_NAME, LOAD_ALL_METHOD_DESC, true);
+                        final MethodInsnNode newInsn = new MethodInsnNode(Opcodes.INVOKESTATIC, type, LOAD_ALL_METHOD_NAME, LOAD_ALL_METHOD_DESC, true);
                         // Basically this entire filter is to make sure `super()` methods are called before `loadAll`
-                        StreamSupport.stream(mthd.instructions.spliterator(), false)
+                        final Optional<MethodInsnNode> insnNode = StreamSupport.stream(mthd.instructions.spliterator(), false)
                             .filter(i -> i.getOpcode() == Opcodes.INVOKESPECIAL)
                             .filter(MethodInsnNode.class::isInstance)
                             .map(MethodInsnNode.class::cast)
                             .filter(i -> i.owner.equals(clazz.superName))
                             .filter(i -> i.name.equals("<init>") || i.name.equals(mthd.name))
-                            .findFirst()
-                            .ifPresentOrElse(superInsn -> mthd.instructions.insert(superInsn, newInsn), () -> mthd.instructions.insert(newInsn));
+                            .findFirst();
+                        if (insnNode.isPresent()) {
+                            mthd.instructions.insert(insnNode.get(), newInsn);
+                        } else {
+                            mthd.instructions.insert(newInsn);
+                        }
                         return true;
                     })
                     .findFirst()

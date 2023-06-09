@@ -30,6 +30,7 @@ package com.matyrobbrt.registrationutils.gradle;
 
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
+import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.plugins.JavaPlugin;
 
 public class RegistrationUtilsPlugin implements Plugin<Project> {
@@ -44,24 +45,24 @@ public class RegistrationUtilsPlugin implements Plugin<Project> {
 
     @Override
     public void apply(Project project) {
-        final var ext = project.getExtensions().create(RegistrationUtilsExtension.NAME, RegistrationUtilsExtension.class, project);
+        final RegistrationUtilsExtension ext = project.getExtensions().create(RegistrationUtilsExtension.NAME, RegistrationUtilsExtension.class, project);
         project.afterEvaluate($$ -> {
             ext.getProjects().forEach(sub -> {
-                final var proj = sub.project.get();
-                final var reg = proj.getExtensions().create(ext.extensionName.get(), RegExtension.class, project, proj, ext, sub);
+                final Project proj = sub.project.get();
+                final RegExtension reg = proj.getExtensions().create(ext.extensionName.get(), RegExtension.class, project, proj, ext, sub);
                 if (ext.addsDependencies()) {
-                    final var compConfig = proj.getConfigurations().findByName(JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME);
+                    final Configuration compConfig = proj.getConfigurations().findByName(JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME);
                     if (compConfig != null) {
                         compConfig.getDependencies().add(reg.common());
                     }
 
-                    final var testCompConfig = proj.getConfigurations().findByName(JavaPlugin.TEST_COMPILE_ONLY_CONFIGURATION_NAME);
+                    final Configuration testCompConfig = proj.getConfigurations().findByName(JavaPlugin.TEST_COMPILE_ONLY_CONFIGURATION_NAME);
                     if (testCompConfig != null) {
                         testCompConfig.getDependencies().add(reg.common());
                     }
 
                     if (sub.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON) {
-                        final var runtimeConfiguration = proj.getConfigurations().findByName(JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME);
+                        final Configuration runtimeConfiguration = proj.getConfigurations().findByName(JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME);
                         if (runtimeConfiguration != null) {
                             runtimeConfiguration.getDependencies().add(reg.joined());
                         }

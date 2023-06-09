@@ -70,6 +70,7 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
     public void addDependencies(boolean addDependencies) {
         this.addDependencies = addDependencies;
     }
+
     public void addDependencies() {
         addDependencies(true);
     }
@@ -77,6 +78,7 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
     public void transformHolderLoading(boolean transformHolderLoading) {
         this.transformHolderLoading.set(transformHolderLoading);
     }
+
     public void transformHolderLoading() {
         transformHolderLoading(true);
     }
@@ -84,6 +86,7 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
     public boolean addsDependencies() {
         return addDependencies;
     }
+
     public boolean transformsHolderLoading() {
         return transformHolderLoading.get();
     }
@@ -116,16 +119,25 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
 
             try {
                 type(name);
-            } catch (IllegalArgumentException ignored) {}
+            } catch (IllegalArgumentException ignored) {
+            }
         }
 
         public void type(String type) {
-            this.type.set(switch (type.toLowerCase(Locale.ROOT)) {
-                case "fabric", "quilt" -> Type.FABRIC; // Currently, quilt is the same as fabric
-                case "forge" -> Type.FORGE;
-                case "common" -> Type.COMMON;
-                default -> throw new IllegalArgumentException("Unknown project type " + type);
-            });
+            switch (type.toLowerCase(Locale.ROOT)) {
+                case "fabric":
+                case "quilt": // Currently, quilt is the same as fabric
+                    this.type.set(Type.FABRIC);
+                    break;
+                case "forge":
+                    this.type.set(Type.FORGE);
+                    break;
+                case "common":
+                    this.type.set(Type.COMMON);
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown project type " + type);
+            }
         }
 
         public void mainClass(String mainClass) {
@@ -143,6 +155,7 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
                 project.set(root.findProject(name));
             }
         }
+
         public void project(Project project) {
             this.project.set(project);
         }

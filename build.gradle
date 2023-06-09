@@ -54,6 +54,7 @@ dependencies {
 	shade 'org.ow2.asm:asm:9.3'
 	shade 'org.ow2.asm:asm-tree:9.3'
 	shade 'me.lucko:jar-relocator:1.5'
+	shade 'commons-io:commons-io:2.13.0'
 
 //	compileOnly 'fabric-loom:fabric-loom.gradle.plugin:0.12.21'
 //	compileOnly 'org.spongepowered.gradle.plugin:org.spongepowered.gradle.plugin.gradle.plugin:2.0.2'
@@ -183,7 +184,7 @@ allprojects {
 	license {
 		header = rootProject.file('licenseheader.txt')
 	}
-	java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+	java.toolchain.languageVersion = JavaLanguageVersion.of(8)
 	repositories {
 		mavenCentral()
 	}

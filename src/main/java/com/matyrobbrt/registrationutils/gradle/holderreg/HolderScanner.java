@@ -31,9 +31,11 @@ package com.matyrobbrt.registrationutils.gradle.holderreg;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -65,31 +67,31 @@ public class HolderScanner {
 
     @SuppressWarnings("ALL")
     public boolean processClass(Path path) throws IOException {
-        final var cr = new ClassReader(Files.readAllBytes(path));
+        final ClassReader cr = new ClassReader(Files.readAllBytes(path));
         if (Arrays.asList(cr.getInterfaces()).contains(registryHolderType)) {
             return false;
         }
         boolean found = false;
         ClassNode clazz = new ClassNode(Opcodes.ASM9);
         cr.accept(clazz, 0);
-        for (final var node : clazz.fields) {
+        for (final FieldNode node : clazz.fields) {
             if (node.desc.equals(registrationProvider) && Modifier.isStatic(node.access)) {
                 found = true;
                 break;
             }
         }
         if (found) {
-            final var cw = new ClassWriter(Opcodes.ASM9);
+            final ClassWriter cw = new ClassWriter(Opcodes.ASM9);
             if ((clazz.access & ACC_INTERFACE) != 0) {
                 // Is an interface, we need to use an inner class
-                final var innerName = clazz.name + "$" + INNER_NAME;
+                final String innerName = clazz.name + "$" + INNER_NAME;
                 clazz.visitInnerClass(innerName, clazz.name, INNER_NAME, ACC_PUBLIC | Opcodes.ACC_STATIC | ACC_SUPER);
 
-                final var innerCw = new ClassWriter(0);
+                final ClassWriter innerCw = new ClassWriter(0);
 
                 innerCw.visit(V17, ACC_PUBLIC | ACC_SUPER, innerName, null, "java/lang/Object", new String[] {registryHolderType});
                 {
-                    final var methodVisitor = innerCw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
+                    final MethodVisitor methodVisitor = innerCw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
                     methodVisitor.visitCode();
                     Label label0 = new Label();
                     methodVisitor.visitLabel(label0);

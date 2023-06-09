@@ -38,37 +38,18 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.RegistrySetBuilder;
 import net.minecraft.data.DataProvider;
-import net.minecraft.data.registries.VanillaRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.registries.DataPackRegistryEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import sun.misc.Unsafe;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Stream;
 
 @ParametersAreNonnullByDefault
 public class ForgeDatapackRegistryBuilder<T> implements DatapackRegistryBuilder<T> {
-    private static final Unsafe UNSAFE;
-    private static final long offset$VANILLA_REGISTRIES;
-
-    static {
-        try {
-            final var field = Unsafe.class.getDeclaredField("theUnsafe");
-            field.setAccessible(true);
-            UNSAFE = (Unsafe) field.get(null);
-
-            offset$VANILLA_REGISTRIES = UNSAFE.staticFieldOffset(Stream.of(VanillaRegistries.class.getDeclaredFields())
-                    .filter(it -> it.getType() == RegistrySetBuilder.class).findFirst().orElseThrow());
-        } catch (Exception ex) {
-            throw new RuntimeException("Barf!", ex);
-        }
-    }
-
     private final ResourceKey<Registry<T>> key;
     private Codec<T> elementCodec;
     private @Nullable Codec<T> networkCodec;

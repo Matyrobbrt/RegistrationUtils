@@ -39,6 +39,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,6 +47,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
@@ -77,29 +79,29 @@ public abstract class RelocateResourceTask extends DefaultTask implements Runnab
     }
 
     public static boolean relocate(Logger logger, ZipInputStream input, Path output, String fromGroup, String toGroup, BiFunction<String, FileData, String> extraReplaceFunction) {
-        final var regex = Pattern.compile(fromGroup.replace(".", "\\."));
+        final Pattern regex = Pattern.compile(fromGroup.replace(".", "\\."));
         try {
             forEachEntry(input, (name, data) -> {
-                final var fileData = FileData.create(name);
+                final FileData fileData = FileData.create(name);
                 if (fileData.fileName.equals("regutils.refmap.json")) {
                     final String str = data.toString();
-                    Files.writeString(output.resolve(fileData.directory.isEmpty() ? fileData.fileName : fileData.directory + "/" + fileData.fileName),
-                            str.replace(fromGroup.replace('.', '/'), toGroup.replace('.', '/')));
+                    Files.write(output.resolve(fileData.directory.isEmpty() ? fileData.fileName : fileData.directory + "/" + fileData.fileName),
+                            str.replace(fromGroup.replace('.', '/'), toGroup.replace('.', '/')).getBytes(StandardCharsets.UTF_8));
                     return;
                 }
 
-                final var relocatedName = regex.matcher(fileData.fileName()).replaceAll(toGroup);
-                final var pkg = fileData.directory().replace('/', '.');
-                var path = output.resolve(fileData.directory().isEmpty() ? relocatedName : regex.matcher(pkg).replaceAll(toGroup).replace('.', '/') + "/" + relocatedName);
+                final String relocatedName = regex.matcher(fileData.fileName).replaceAll(toGroup);
+                final String pkg = fileData.directory.replace('/', '.');
+                Path path = output.resolve(fileData.directory.isEmpty() ? relocatedName : regex.matcher(pkg).replaceAll(toGroup).replace('.', '/') + "/" + relocatedName);
                 if (path.getParent() != null) {
                     Files.createDirectories(path.getParent());
                 }
                 Files.deleteIfExists(path);
-                if (fileData.fileName().endsWith(".class")) { // Don't process class files
+                if (fileData.fileName.endsWith(".class")) { // Don't process class files
                     path = output.resolve(name);
                     Files.copy(new ByteArrayInputStream(data.toByteArray()), path, StandardCopyOption.REPLACE_EXISTING);
                 } else {
-                    Files.writeString(path, extraReplaceFunction.apply(regex.matcher(data.toString()).replaceAll(toGroup), fileData), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+                    Files.write(path, extraReplaceFunction.apply(regex.matcher(data.toString()).replaceAll(toGroup), fileData).getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
                 }
             });
         } catch (IOException e) {
@@ -110,12 +112,12 @@ public abstract class RelocateResourceTask extends DefaultTask implements Runnab
     }
 
     public static byte[] filesZip(Path directory) throws IOException {
-        final var bo = new ByteArrayOutputStream();
-        final var zipOut = new ZipOutputStream(bo);
-        Files.walkFileTree(directory, new SimpleFileVisitor<>() {
+        final ByteArrayOutputStream bo = new ByteArrayOutputStream();
+        final ZipOutputStream zipOut = new ZipOutputStream(bo);
+        Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                final var zipEntry = new ZipEntry(directory.relativize(file).toString());
+                final ZipEntry zipEntry = new ZipEntry(directory.relativize(file).toString());
                 zipOut.putNextEntry(zipEntry);
                 zipOut.write(Files.readAllBytes(file));
                 zipOut.closeEntry();
@@ -130,7 +132,7 @@ public abstract class RelocateResourceTask extends DefaultTask implements Runnab
         ZipEntry entry;
         while ((entry = stream.getNextEntry()) != null) {
             if (!entry.isDirectory()) {
-                try (final var bos = readBytes(stream)) {
+                try (final ByteArrayOutputStream bos = readBytes(stream)) {
                     action.accept(entry.getName(), bos);
                 }
             }
@@ -138,7 +140,7 @@ public abstract class RelocateResourceTask extends DefaultTask implements Runnab
     }
 
     public static ByteArrayOutputStream readBytes(InputStream stream) throws IOException {
-        final var bos = new ByteArrayOutputStream();
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
         int len;
         while ((len = stream.read()) > 0) {
             bos.write(len);
@@ -151,15 +153,21 @@ public abstract class RelocateResourceTask extends DefaultTask implements Runnab
     }
 
     public static ZipInputStream getResourceDir(String zip) {
-        final var stream = Objects.requireNonNull(RegistrationUtilsPlugin.class.getResourceAsStream("/" + zip));
+        final InputStream stream = Objects.requireNonNull(RegistrationUtilsPlugin.class.getResourceAsStream("/" + zip));
         return new ZipInputStream(stream);
     }
 
-    public record FileData(String fileName, String directory) {
+    public static class FileData {
+        public final String fileName, directory;
+        public FileData(String fileName, String directory) {
+            this.fileName = fileName;
+            this.directory = directory;
+        }
+
         public static FileData create(String name) {
-            final var split = name.split("/");
-            final var fileName = split[split.length - 1];
-            final var dir = split.length == 1 ? "" : String.join("/", List.of(split).subList(0, split.length - 1));
+            final String[] split = name.split("/");
+            final String fileName = split[split.length - 1];
+            final String dir = split.length == 1 ? "" : String.join("/", Arrays.asList(split).subList(0, split.length - 1));
             return new FileData(fileName, dir);
         }
     }
