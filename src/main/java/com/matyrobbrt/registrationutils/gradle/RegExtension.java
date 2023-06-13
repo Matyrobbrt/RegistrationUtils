@@ -228,7 +228,7 @@ public class RegExtension {
                         try (final FileSystem fs = FileSystems.newFileSystem(jar.getArchiveFile().get().getAsFile().toPath())) {
                             final Path configPath = fs.getPath(mixinsConfig);
                             if (Files.exists(configPath)) {
-                                final String str = Files.readString(configPath);
+                                final String str = Files.readString(configPath, StandardCharsets.UTF_8);
                                 Files.writeString(configPath, str.replace("regutils.refmap.json", configName + ".refmap.json"));
                             }
 
