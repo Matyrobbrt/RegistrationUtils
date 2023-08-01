@@ -34,13 +34,13 @@ import com.matyrobbrt.registrationutils.registries.DatapackRegistry;
 import com.matyrobbrt.registrationutils.registries.DatapackRegistryBuilder;
 import com.matyrobbrt.registrationutils.util.DatapackRegistryGenerator;
 import com.mojang.serialization.Codec;
+import net.fabricmc.fabric.api.event.registry.DynamicRegistries;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.RegistrySetBuilder;
 import net.minecraft.core.RegistrySynchronization;
 import net.minecraft.data.DataProvider;
-import net.minecraft.data.registries.VanillaRegistries;
 import net.minecraft.resources.RegistryDataLoader;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -138,28 +138,32 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
         OWNED_REGISTRIES.add(key.location());
 
         try {
-            final List<RegistryDataLoader.RegistryData<?>> mutableCopy = new ArrayList<>(RegistryDataLoader.WORLDGEN_REGISTRIES);
-            mutableCopy.add(new RegistryDataLoader.RegistryData<>(
-                    key, elementCodec
-            ));
-            UNSAFE.putObject(RegistryDataLoader.class, offset$WORLDGEN_REGISTRIES, List.copyOf(mutableCopy));
+            registerWithFAPI();
+        } catch (Exception cnfe) {
+            try {
+                final List<RegistryDataLoader.RegistryData<?>> mutableCopy = new ArrayList<>(RegistryDataLoader.WORLDGEN_REGISTRIES);
+                mutableCopy.add(new RegistryDataLoader.RegistryData<>(
+                        key, elementCodec
+                ));
+                UNSAFE.putObject(RegistryDataLoader.class, offset$WORLDGEN_REGISTRIES, List.copyOf(mutableCopy));
 
-            if (networkCodec != null) {
-                final Object data = new$NetworkedRegistryData.invoke(key, networkCodec);
+                if (networkCodec != null) {
+                    final Object data = new$NetworkedRegistryData.invoke(key, networkCodec);
 
-                Map<ResourceKey<? extends Registry<?>>, Object> registries = (Map<ResourceKey<? extends Registry<?>>, Object>) UNSAFE.getObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES);
-                if (registries == null) {
-                    UNSAFE.allocateInstance(RegistrySynchronization.class); // Allocate a new instance of RegistrySynchronization in order to make sure the field is initialised
-                    registries = (Map<ResourceKey<? extends Registry<?>>, Object>) UNSAFE.getObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES);
+                    Map<ResourceKey<? extends Registry<?>>, Object> registries = (Map<ResourceKey<? extends Registry<?>>, Object>) UNSAFE.getObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES);
+                    if (registries == null) {
+                        UNSAFE.allocateInstance(RegistrySynchronization.class); // Allocate a new instance of RegistrySynchronization in order to make sure the field is initialised
+                        registries = (Map<ResourceKey<? extends Registry<?>>, Object>) UNSAFE.getObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES);
+                    }
+
+                    final ImmutableMap.Builder<ResourceKey<? extends Registry<?>>, Object> builder = ImmutableMap.builder();
+                    builder.putAll(registries);
+                    builder.put(key, data);
+                    UNSAFE.putObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES, builder.build());
                 }
-
-                final ImmutableMap.Builder<ResourceKey<? extends Registry<?>>, Object> builder = ImmutableMap.builder();
-                builder.putAll(registries);
-                builder.put(key, data);
-                UNSAFE.putObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES, builder.build());
+            } catch (Throwable throwable) {
+                throw new RuntimeException("Could not register datapack registry: ", throwable);
             }
-        } catch (Throwable throwable) {
-            throw new RuntimeException("Could not register datapack registry: ", throwable);
         }
 
         return new DatapackRegistry<>() {
@@ -183,6 +187,14 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
                 return registryAccess.registryOrThrow(key);
             }
         };
+    }
+
+    private void registerWithFAPI() {
+        if (networkCodec == null) {
+            DynamicRegistries.register(key, elementCodec);
+        } else {
+            DynamicRegistries.registerSynced(key, elementCodec, networkCodec);
+        }
     }
 
     private static Object getStaticOrNull(Field field) {
