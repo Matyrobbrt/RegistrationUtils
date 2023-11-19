@@ -26,7 +26,7 @@
  * SOFTWARE.
  */
 
-package com.matyrobbrt.registrationutils.forge;
+package com.matyrobbrt.registrationutils.neoforge;
 
 import com.google.auto.service.AutoService;
 import com.google.common.base.Suppliers;

@@ -129,8 +129,8 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
                 case "quilt": // Currently, quilt is the same as fabric
                     this.type.set(Type.FABRIC);
                     break;
-                case "forge":
-                    this.type.set(Type.FORGE);
+                case "neoforge":
+                    this.type.set(Type.NEOFORGE);
                     break;
                 case "common":
                     this.type.set(Type.COMMON);
@@ -171,10 +171,10 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
                     return "fabric";
                 }
             },
-            FORGE(new MainClassHolderTransformer.LoadAllHolders("<init>()V")) {
+            NEOFORGE(new MainClassHolderTransformer.LoadAllHolders("<init>()V")) {
                 @Override
                 public String toString() {
-                    return "forge";
+                    return "neoforge";
                 }
             },
             COMMON(null) {

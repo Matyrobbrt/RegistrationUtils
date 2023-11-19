@@ -39,8 +39,8 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.RegistrySetBuilder;
 import net.minecraft.data.DataProvider;
 import net.minecraft.resources.ResourceKey;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.registries.DataPackRegistryEvent;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.registries.DataPackRegistryEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -49,13 +49,13 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 @ParametersAreNonnullByDefault
-public class ForgeDatapackRegistryBuilder<T> implements DatapackRegistryBuilder<T> {
+public class NeoForgeDatapackRegistryBuilder<T> implements DatapackRegistryBuilder<T> {
     private final ResourceKey<Registry<T>> key;
     private Codec<T> elementCodec;
     private @Nullable Codec<T> networkCodec;
     private @Nullable RegistrySetBuilder.RegistryBootstrap<T> bootstrap;
 
-    private ForgeDatapackRegistryBuilder(ResourceKey<Registry<T>> key) {
+    private NeoForgeDatapackRegistryBuilder(ResourceKey<Registry<T>> key) {
         this.key = Objects.requireNonNull(key, "registry key must not be null");
     }
 
@@ -79,7 +79,7 @@ public class ForgeDatapackRegistryBuilder<T> implements DatapackRegistryBuilder<
 
     @Override
     public DatapackRegistry<T> build() {
-        final IEventBus bus = ForgeRegistrationFactory.getBus(key.location().getNamespace());
+        final IEventBus bus = NeoForgeRegistrationFactory.getBus(key.location().getNamespace());
         bus.addListener((final DataPackRegistryEvent.NewRegistry event) -> event.dataPackRegistry(key, Objects.requireNonNull(elementCodec, "element codec must not be null"), networkCodec));
 
         return new DatapackRegistry<>() {
@@ -110,7 +110,7 @@ public class ForgeDatapackRegistryBuilder<T> implements DatapackRegistryBuilder<
 
         @Override
         public <T> DatapackRegistryBuilder<T> newBuilder(ResourceKey<Registry<T>> key) {
-            return new ForgeDatapackRegistryBuilder<>(key);
+            return new NeoForgeDatapackRegistryBuilder<>(key);
         }
     }
 }

@@ -26,49 +26,44 @@
  * SOFTWARE.
  */
 
-package com.matyrobbrt.registrationutils;
+package com.matyrobbrt.registrationutils.neoforge;
 
-import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.javafmlmod.FMLModContainer;
 
-import java.util.function.Supplier;
+import javax.annotation.Nullable;
+import java.util.Objects;
+import java.util.ServiceLoader;
 
 /**
- * Represents a lazy wrapper for registry object.
- *
- * @param <R> the type of the registry (the object base type)
- * @param <T> the type of the object
+ * An interface loaded through Service Loaders, for providing the mod event bus for a
+ * mod container, which is used by the {@link NeoForgeRegistrationFactory} for getting the bus
+ * that a {@link net.neoforged.neoforge.registries.DeferredRegister} should be registered to.
  */
-public interface RegistryObject<R, T extends R> extends Supplier<T> {
+public interface NeoForgeBusGetter {
 
     /**
-     * Gets the {@link ResourceKey} of the registry of the object wrapped.
+     * Gets the mod event bus for a container.
      *
-     * @return the {@link ResourceKey} of the registry
+     * @param container the container of the mod
+     * @return the bus. Can be null
      */
-    ResourceKey<R> getResourceKey();
+    @Nullable
+    IEventBus getModEventBus(ModContainer container);
 
-    /**
-     * Gets the id of the object.
-     *
-     * @return the id of the object
-     */
-    ResourceLocation getId();
-
-    /**
-     * Gets the object behind this wrapper. Calling this method too early
-     * might result in crashes.
-     *
-     * @return the object behind this wrapper
-     */
-    @Override
-    T get();
-
-    /**
-     * Gets this object wrapped in a vanilla {@link Holder}.
-     *
-     * @return the holder
-     */
-    Holder<R> asHolder();
+    @Nullable
+    static IEventBus getBus(ModContainer container) {
+        return ServiceLoader.load(NeoForgeBusGetter.class)
+                .stream()
+                .map(p -> p.get().getModEventBus(container))
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElseGet(() -> {
+                    if (container instanceof FMLModContainer fmlModContainer) {
+                        return fmlModContainer.getEventBus();
+                    }
+                    return null;
+                });
+    }
 }

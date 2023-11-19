@@ -29,6 +29,7 @@
 package com.matyrobbrt.registrationutils;
 
 import com.matyrobbrt.registrationutils.registries.RegistryBuilder;
+import com.matyrobbrt.registrationutils.specialised.SpecialisedRegistrationFactory;
 import com.matyrobbrt.registrationutils.util.$InternalRegUtils;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
@@ -104,14 +105,14 @@ public interface RegistrationProvider<T> {
      * @return a wrapper containing the lazy registered object. <strong>Calling {@link RegistryObject#get() get} too early
      * on the wrapper might result in crashes!</strong>
      */
-    <I extends T> RegistryObject<I> register(String name, Supplier<? extends I> supplier);
+    <I extends T> RegistryObject<T, I> register(String name, Supplier<? extends I> supplier);
 
     /**
      * Gets all the objects currently registered.
      *
      * @return an <strong>immutable</strong> view of all the objects currently registered
      */
-    Collection<RegistryObject<T>> getEntries();
+    Collection<RegistryObject<T, ? extends T>> getEntries();
 
     /**
      * Gets the registry key stored in this provider.
@@ -147,7 +148,7 @@ public interface RegistrationProvider<T> {
      * This class is loaded using {@link java.util.ServiceLoader Service Loaders}, and only one
      * should exist per mod loader.
      */
-    interface Factory {
+    interface Factory extends SpecialisedRegistrationFactory {
 
         /**
          * The singleton instance of the {@link Factory}. This is different on each loader.

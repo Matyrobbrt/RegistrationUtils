@@ -10,7 +10,7 @@ is provided in a Gradle plugin form, that installs the RegistrationUtils depende
 your mod jars. The steps that the plugin makes:
 
 - unpack and relocate the compiled library
-- add the library as a dependency to the subprojects (Common, Forge and Fabric)
+- add the library as a dependency to the subprojects (Common, NeoForge and Fabric)
 - make the `jar` task include the library in the final jar.
   **Do not worry about licensing!** The library is MIT licensed, and the plugin makes sure that an original copy of the
   license is included in the final jar, so you're clear.
@@ -43,7 +43,7 @@ configuration of the plugin:
 projects {
     // A project is declared like so: name { configuration }
     Fabric { type 'fabric' } // The fabric project
-    Forge { type 'forge' } // The forge project
+    NeoForge { type 'neoforge' } // The neoforge project
     Common { type 'common' } // The common project
 }
 ```
@@ -58,7 +58,7 @@ registrationUtils {
     group 'com.example.examplemod.registration'
     projects {
         Fabric { type 'fabric' } // The fabric project
-        Forge { type 'forge' } // The forge project
+        NeoForge { type 'neoforge' } // The neoforge project
         Common { type 'common' } // The common project
     }
 }

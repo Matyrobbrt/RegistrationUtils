@@ -26,11 +26,9 @@
  * SOFTWARE.
  */
 
-package com.matyrobbrt.registrationutils;
+package com.matyrobbrt.registrationutils.specialised;
 
-import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import com.matyrobbrt.registrationutils.RegistryObject;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.block.Block;
@@ -42,7 +40,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param <B> the type of the block
  */
-public interface BlockRegistryObject<B extends Block> extends RegistryObject<B>, ItemLike {
+public interface BlockRegistryObject<B extends Block> extends RegistryObject<Block, B>, ItemLike {
 
     /**
      * Gets the default state of this block.
@@ -61,36 +59,5 @@ public interface BlockRegistryObject<B extends Block> extends RegistryObject<B>,
     @Override
     default @NotNull Item asItem() {
         return get().asItem();
-    }
-
-    /**
-     * Wraps a normal registry object into a specialized block one.
-     *
-     * @param object the object to wrap
-     * @param <B>    the type of the block
-     * @return the wrapper
-     */
-    static <B extends Block> BlockRegistryObject<B> wrap(RegistryObject<B> object) {
-        return new BlockRegistryObject<>() {
-            @Override
-            public ResourceKey<B> getResourceKey() {
-                return object.getResourceKey();
-            }
-
-            @Override
-            public ResourceLocation getId() {
-                return object.getId();
-            }
-
-            @Override
-            public B get() {
-                return object.get();
-            }
-
-            @Override
-            public Holder<B> asHolder() {
-                return object.asHolder();
-            }
-        };
     }
 }

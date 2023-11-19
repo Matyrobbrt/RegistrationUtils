@@ -52,22 +52,12 @@ public final class RegistryFeatureType<X> {
     public static final RegistryFeatureType<Void> SYNCED = getNoArgs(new ResourceLocation("synced"));
 
     /**
-     * When a registry has this feature, its IDs will be saved to disk (it will be a persistent registry). Works on both loaders.
-     */
-    public static final RegistryFeatureType<Void> SAVED_TO_DISK = getNoArgs(new ResourceLocation("saved_to_disk"));
-
-    /**
      * When a registry has this feature, it will be a {@link net.minecraft.core.DefaultedRegistry}. Works on both loaders. <br>
      * This feature accepts an argument of type {@link ResourceLocation} which is the ID of the default value.
      *
      * @see RegistryBuilder#withDefaultValue(String, Supplier)
      */
     public static final RegistryFeatureType<ResourceLocation> DEFAULTED = get(new ResourceLocation("defaulted"), ResourceLocation.class);
-
-    /**
-     * When a registry has this feature, it will support registry overrides. <strong>Forge-only</strong>
-     */
-    public static final RegistryFeatureType<Void> SUPPORTS_OVERRIDES = getNoArgs(new ResourceLocation("forge", "supports_overrides"));
 
     private final ResourceLocation id;
     private final Class<X> argumentType;

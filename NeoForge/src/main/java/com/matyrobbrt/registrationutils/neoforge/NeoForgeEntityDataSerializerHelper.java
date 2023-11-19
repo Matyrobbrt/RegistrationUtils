@@ -26,49 +26,33 @@
  * SOFTWARE.
  */
 
-package com.matyrobbrt.registrationutils;
+package com.matyrobbrt.registrationutils.neoforge;
 
-import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceKey;
+import com.google.auto.service.AutoService;
+import com.matyrobbrt.registrationutils.EntityDataSerializerHelper;
+import com.matyrobbrt.registrationutils.RegistrationProvider;
+import net.minecraft.network.syncher.EntityDataSerializer;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
+import org.jetbrains.annotations.ApiStatus;
 
-import java.util.function.Supplier;
+import javax.annotation.ParametersAreNonnullByDefault;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Represents a lazy wrapper for registry object.
- *
- * @param <R> the type of the registry (the object base type)
- * @param <T> the type of the object
- */
-public interface RegistryObject<R, T extends R> extends Supplier<T> {
+@ApiStatus.Internal
+@ParametersAreNonnullByDefault
+@AutoService(EntityDataSerializerHelper.class)
+public class NeoForgeEntityDataSerializerHelper implements EntityDataSerializerHelper {
+    private final Map<String, RegistrationProvider<EntityDataSerializer<?>>> byModId = new ConcurrentHashMap<>();
 
-    /**
-     * Gets the {@link ResourceKey} of the registry of the object wrapped.
-     *
-     * @return the {@link ResourceKey} of the registry
-     */
-    ResourceKey<R> getResourceKey();
-
-    /**
-     * Gets the id of the object.
-     *
-     * @return the id of the object
-     */
-    ResourceLocation getId();
-
-    /**
-     * Gets the object behind this wrapper. Calling this method too early
-     * might result in crashes.
-     *
-     * @return the object behind this wrapper
-     */
     @Override
-    T get();
+    public <T> EntityDataSerializer<T> register(ResourceLocation key, EntityDataSerializer<T> serializer) {
+        getProvider(key.getNamespace()).register(key.getPath(), () -> serializer);
+        return serializer;
+    }
 
-    /**
-     * Gets this object wrapped in a vanilla {@link Holder}.
-     *
-     * @return the holder
-     */
-    Holder<R> asHolder();
+    private RegistrationProvider<EntityDataSerializer<?>> getProvider(String modId) {
+        return byModId.computeIfAbsent(modId, theId -> RegistrationProvider.get(NeoForgeRegistries.Keys.ENTITY_DATA_SERIALIZERS, theId));
+    }
 }

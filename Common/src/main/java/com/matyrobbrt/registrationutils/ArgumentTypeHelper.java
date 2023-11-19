@@ -65,7 +65,7 @@ public interface ArgumentTypeHelper {
      * @param <I>        the argument serializer type
      * @return a wrapper containing the lazy registered object. <strong>Calling get too early on the wrapper might result in crashes!</strong>
      */
-    <A extends ArgumentType<?>, T extends ArgumentTypeInfo.Template<A>, I extends ArgumentTypeInfo<A, T>> RegistryObject<I> register(
+    <A extends ArgumentType<?>, T extends ArgumentTypeInfo.Template<A>, I extends ArgumentTypeInfo<A, T>> RegistryObject<ArgumentTypeInfo<?, ?>, I> register(
             RegistrationProvider<ArgumentTypeInfo<?, ?>> provider,
             String name, Class<A> clazz,
             Supplier<I> serializer

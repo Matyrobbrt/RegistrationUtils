@@ -1,5 +1,4 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
-import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -23,8 +22,15 @@ plugins {
 	id 'maven-publish'
 	id 'com.gradle.plugin-publish' version '0.18.0'
 	id 'idea'
-	id 'com.github.johnrengelman.shadow' version '7.1.2'
+	id 'com.github.johnrengelman.shadow' version '8.+'
 	id 'org.cadixdev.licenser' version '0.6.1' apply false
+	// Required for NeoGradle
+	id "org.jetbrains.gradle.plugin.idea-ext" version "1.1.7"
+}
+
+subprojects {
+	apply plugin: 'java'
+	java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 }
 
 group = 'com.matyrobbrt.mc.registrationutils'
@@ -40,7 +46,7 @@ configurations {
 }
 
 repositories {
-	maven { name = 'Forge'; url = 'https://maven.minecraftforge.net/' }
+	maven { name = 'Forge'; url = 'https://maven.neoforged.net/' }
 	maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
 	maven { name = 'Sponge'; url = 'https://repo.spongepowered.org/repository/maven-public/' }
 }
@@ -85,8 +91,8 @@ void createAndAddZipTask(String proj, String outName, Closure<?>... extra) {
 			clos()
 			from(conf.sourcePaths, conf.action)
 		}
-		setDestinationDir(outPath.getParent().toFile())
-		archiveName("${outName}-sources.zip")
+		destinationDirectory.set(outPath.getParent().toFile())
+		archiveFileName.set("${outName}-sources.zip")
 	}
 	task.dependsOn(zip)
 	final var jarTask = project(":${proj}").tasks.named('jar', org.gradle.jvm.tasks.Jar).get();
@@ -117,7 +123,7 @@ class ExtraConfiguration {
 pluginBundle {
 	website = 'https://github.com/Matyrobbrt/RegistrationUtils'
 	vcsUrl = 'https://github.com/Matyrobbrt/RegistrationUtils'
-	tags = ['minecraft', 'forge', 'fabric', 'quilt', 'multiloader']
+	tags = ['minecraft', 'forge', 'neoforge', 'fabric', 'quilt', 'multiloader']
 }
 
 components.java.withVariantsFromConfiguration(configurations.runtimeElements) {
@@ -147,20 +153,16 @@ publishing {
 	}
 }
 
-tasks.create('relocateShadowJar', ConfigureShadowRelocation) {
-	target(tasks.shadowJar)
-	prefix("com.matyrobbrt.registrationutils.gradle.shade")
-}
-
 tasks.named('shadowJar', ShadowJar).configure {
 	archiveClassifier.set('')
 	configurations = [project.configurations.shade]
-	dependsOn('relocateShadowJar')
 	manifest.attributes(makeAttributes())
+	enableRelocation true
+	relocationPrefix("com.matyrobbrt.registrationutils.gradle.shade")
 }
 
 jar {
-	classifier 'lite'
+	archiveClassifier.set 'lite'
 }
 
 Map<?, ?> makeAttributes() {
@@ -184,7 +186,6 @@ allprojects {
 	license {
 		header = rootProject.file('licenseheader.txt')
 	}
-	java.toolchain.languageVersion = JavaLanguageVersion.of(8)
 	repositories {
 		mavenCentral()
 	}
