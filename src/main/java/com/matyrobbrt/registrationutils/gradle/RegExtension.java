@@ -119,7 +119,7 @@ public class RegExtension {
         this.project = project;
         this.config = config;
         this.group = parent.group.get();
-        this.cachePath = root.getBuildDir().toPath().resolve(RegistrationUtilsPlugin.CACHE_FOLDER)
+        this.cachePath = root.getLayout().getBuildDirectory().get().getAsFile().toPath().resolve(RegistrationUtilsPlugin.CACHE_FOLDER)
                 .resolve(Utils.getStringFromSHA256(group)).toAbsolutePath();
 
         int random = ThreadLocalRandom.current().nextInt();
@@ -148,7 +148,7 @@ public class RegExtension {
             project.getTasks().named(JavaPlugin.CLASSES_TASK_NAME, t -> t.doLast(new Action<Task>() {
                 @Override
                 public void execute(Task task) {
-                    handleTransformation(project.getBuildDir().toPath().resolve("classes/java/main"));
+                    handleTransformation(project.getLayout().getBuildDirectory().get().getAsFile().toPath().resolve("classes/java/main"));
                 }
             }));
         }
