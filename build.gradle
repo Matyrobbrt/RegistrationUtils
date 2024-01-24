@@ -52,7 +52,7 @@ repositories {
 }
 
 dependencies {
-	shade 'net.minecraftforge:artifactural:3.0.10'
+	shade 'net.minecraftforge:artifactural:3.0.17'
 	// Thanks Shrimp...
 	shade 'net.minecraftforge:unsafe:0.2.0'
 	shade 'com.google.guava:guava:30.1-jre'
