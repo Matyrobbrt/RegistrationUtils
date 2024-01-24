@@ -81,7 +81,7 @@ this.subprojects({
 
 void createAndAddZipTask(String proj, String outName, Closure<?>... extra) {
 	final var task = (ProcessResources) tasks.getByName('processResources')
-	final var outPath = project.buildDir.toPath().resolve("projectszip").resolve("${outName}-sources.zip")
+	final var outPath = project.getLayout().getBuildDirectory().get().getAsFile().toPath().resolve("projectszip").resolve("${outName}-sources.zip")
 	final var zip = tasks.create("${outName}Zip", Zip) {
 		from "${proj}/src/main/java"
 		from "${proj}/src/main/resources"
