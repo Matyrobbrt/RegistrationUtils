@@ -140,6 +140,10 @@ public class RegistrationUtilsExtension extends GroovyObjectSupport {
             }
         }
 
+        public void type(Type type) {
+            this.type.set(type);
+        }
+
         public void mainClass(String mainClass) {
             this.mainClass.set(mainClass);
         }
