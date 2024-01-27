@@ -7,13 +7,13 @@ import java.time.format.DateTimeFormatter
 
 buildscript {
 	dependencies {
-		classpath 'org.codehaus.groovy:groovy-all:3.0.9'
+		classpath 'org.codehaus.groovy:groovy-all:3.0.17'
 	}
 	// Hacky workaround to shadow using an outdated ASM version
 	configurations.all {
 		resolutionStrategy {
-			force("org.ow2.asm:asm:9.3")
-			force("org.ow2.asm:asm-commons:9.3")
+			force("org.ow2.asm:asm:9.6")
+			force("org.ow2.asm:asm-commons:9.6")
 		}
 	}
 }
@@ -49,15 +49,12 @@ dependencies {
 	shade('net.neoforged:artifactural:3.0.17') { transitive = false }
 	// Thanks Shrimp...
 	shade 'net.minecraftforge:unsafe:0.2.0'
-	shade 'com.google.guava:guava:30.1-jre'
+	shade 'com.google.guava:guava:33.0.0-jre'
 
-	shade 'org.ow2.asm:asm:9.3'
-	shade 'org.ow2.asm:asm-tree:9.3'
-	shade 'me.lucko:jar-relocator:1.5'
-	shade 'commons-io:commons-io:2.13.0'
-
-//	compileOnly 'fabric-loom:fabric-loom.gradle.plugin:0.12.21'
-//	compileOnly 'org.spongepowered.gradle.plugin:org.spongepowered.gradle.plugin.gradle.plugin:2.0.2'
+	shade 'org.ow2.asm:asm:9.6'
+	shade 'org.ow2.asm:asm-tree:9.6'
+	shade 'me.lucko:jar-relocator:1.7'
+	shade 'commons-io:commons-io:2.15.1'
 }
 
 this.subprojects({
@@ -85,8 +82,8 @@ void createAndAddZipTask(String proj, String outName, Closure<?>... extra) {
 			clos()
 			from(conf.sourcePaths, conf.action)
 		}
-		setDestinationDir(outPath.getParent().toFile())
-		archiveName("${outName}-sources.zip")
+		destinationDirectory.set(outPath.getParent().toFile())
+		archiveFileName.set("${outName}-sources.zip")
 	}
 	task.dependsOn(zip)
 	final var jarTask = project(":${proj}").tasks.named('jar', org.gradle.jvm.tasks.Jar).get();
@@ -159,9 +156,7 @@ tasks.named('shadowJar', ShadowJar).configure {
 	manifest.attributes(makeAttributes())
 }
 
-jar {
-	classifier 'lite'
-}
+jar.archiveClassifier.set('lite')
 
 Map<?, ?> makeAttributes() {
 	final var actualDateTime = OffsetDateTime.now(ZoneOffset.UTC).withNano(0)
