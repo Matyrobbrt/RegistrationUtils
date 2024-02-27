@@ -7,7 +7,7 @@ pluginManagement {
         }
         maven {
             name = 'Forge'
-            url = 'https://maven.minecraftforge.net/'
+            url = 'https://maven.neoforged.net/'
         }
     }
 }

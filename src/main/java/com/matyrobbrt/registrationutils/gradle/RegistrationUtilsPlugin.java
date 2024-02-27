@@ -43,6 +43,8 @@ public class RegistrationUtilsPlugin implements Plugin<Project> {
 
     public static final String CACHE_FOLDER = "registrationutils";
 
+    public static final String CONFIGURATION_NAME = "registrationUtils";
+
     @Override
     public void apply(Project project) {
         final RegistrationUtilsExtension ext = project.getExtensions().create(RegistrationUtilsExtension.NAME, RegistrationUtilsExtension.class, project);
@@ -51,20 +53,23 @@ public class RegistrationUtilsPlugin implements Plugin<Project> {
                 final Project proj = sub.project.get();
                 final RegExtension reg = proj.getExtensions().create(ext.extensionName.get(), RegExtension.class, project, proj, ext, sub);
                 if (ext.addsDependencies()) {
+                    final Configuration regUtilsConfig = proj.getConfigurations().maybeCreate(CONFIGURATION_NAME);
+                    regUtilsConfig.getDependencies().add(reg.common());
+
                     final Configuration compConfig = proj.getConfigurations().findByName(JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME);
                     if (compConfig != null) {
-                        compConfig.getDependencies().add(reg.common());
+                        compConfig.extendsFrom(regUtilsConfig);
                     }
 
                     final Configuration testCompConfig = proj.getConfigurations().findByName(JavaPlugin.TEST_COMPILE_ONLY_CONFIGURATION_NAME);
                     if (testCompConfig != null) {
-                        testCompConfig.getDependencies().add(reg.common());
+                        testCompConfig.extendsFrom(regUtilsConfig);
                     }
 
                     if (sub.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON) {
-                        final Configuration runtimeConfiguration = proj.getConfigurations().findByName(JavaPlugin.RUNTIME_ONLY_CONFIGURATION_NAME);
-                        if (runtimeConfiguration != null) {
-                            runtimeConfiguration.getDependencies().add(reg.joined());
+                        final Configuration runtimeClasspathConfig = proj.getConfigurations().findByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME);
+                        if (runtimeClasspathConfig != null) {
+                            runtimeClasspathConfig.extendsFrom(regUtilsConfig);
                         }
                     }
                 }
