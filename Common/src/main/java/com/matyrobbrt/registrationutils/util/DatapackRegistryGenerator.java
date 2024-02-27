@@ -44,7 +44,6 @@ import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceKey;
 import org.slf4j.Logger;
 
-import javax.annotation.ParametersAreNonnullByDefault;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -53,7 +52,6 @@ import java.util.function.Predicate;
 /**
  * A {@link DataProvider} used to generate bootstrap entries of all registries that match the given {@code predicate}.
  */
-@ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class DatapackRegistryGenerator implements DataProvider {
     private static final Logger LOGGER = LogUtils.getLogger();

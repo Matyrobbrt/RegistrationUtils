@@ -34,10 +34,8 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.RegistrySetBuilder;
 import net.minecraft.resources.ResourceKey;
 import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.annotation.ParametersAreNonnullByDefault;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -45,7 +43,6 @@ import java.util.concurrent.CompletableFuture;
  *
  * @see DatapackRegistry#builder(ResourceKey)
  */
-@ParametersAreNonnullByDefault
 public interface DatapackRegistryBuilder<T> {
 
     /**
@@ -54,7 +51,7 @@ public interface DatapackRegistryBuilder<T> {
      * @param codec the codec used to decode registry elements from json
      * @return the builder instance
      */
-    DatapackRegistryBuilder<T> withElementCodec(@Nonnull Codec<T> codec);
+    DatapackRegistryBuilder<T> withElementCodec(Codec<T> codec);
 
     /**
      * Sets the codec used to encode registry elements to network for client syncing. <br>

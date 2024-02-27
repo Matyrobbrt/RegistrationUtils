@@ -12,6 +12,8 @@ apply plugin: 'net.minecraftforge.gradle'
 apply plugin: 'eclipse'
 apply plugin: 'maven-publish'
 
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
 minecraft {
     mappings channel: 'official', version: minecraft_version
 }

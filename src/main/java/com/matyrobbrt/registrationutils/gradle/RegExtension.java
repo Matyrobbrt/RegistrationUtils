@@ -28,47 +28,36 @@
 
 package com.matyrobbrt.registrationutils.gradle;
 
-import com.google.common.collect.Lists;
 import com.matyrobbrt.registrationutils.gradle.holderreg.HolderScanner;
-import com.matyrobbrt.registrationutils.gradle.task.RelocateResourceTask;
+import com.matyrobbrt.registrationutils.gradle.task.GenerateArtifactTask;
+import com.matyrobbrt.registrationutils.gradle.task.GenerateSourcesTask;
+import com.matyrobbrt.registrationutils.gradle.task.GenerateTask;
 import groovy.json.JsonGenerator;
 import groovy.json.JsonSlurper;
-import me.lucko.jarrelocator.JarRelocator;
-import me.lucko.jarrelocator.Relocation;
-import net.minecraftforge.artifactural.api.artifact.ArtifactIdentifier;
-import net.minecraftforge.artifactural.base.repository.ArtifactProviderBuilder;
-import net.minecraftforge.artifactural.base.repository.SimpleRepository;
-import net.minecraftforge.artifactural.gradle.GradleRepositoryAdapter;
-import org.apache.commons.io.IOUtils;
 import org.gradle.api.Action;
 import org.gradle.api.Project;
 import org.gradle.api.Task;
+import org.gradle.api.UnknownDomainObjectException;
 import org.gradle.api.artifacts.Dependency;
-import org.gradle.api.internal.project.ProjectInternal;
+import org.gradle.api.file.ConfigurableFileCollection;
+import org.gradle.api.file.DuplicatesStrategy;
+import org.gradle.api.plugins.ExtensionAware;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.tasks.AbstractCopyTask;
+import org.gradle.api.tasks.TaskProvider;
 import org.gradle.api.tasks.bundling.AbstractArchiveTask;
 import org.gradle.api.tasks.bundling.Jar;
-import org.gradle.plugins.ide.eclipse.model.Classpath;
-import org.gradle.plugins.ide.eclipse.model.EclipseModel;
-import org.gradle.plugins.ide.eclipse.model.Library;
-import org.gradle.plugins.ide.idea.IdeaPlugin;
-import org.gradle.plugins.ide.idea.model.ModuleLibrary;
-import org.gradle.testfixtures.ProjectBuilder;
+import org.gradle.plugins.ide.idea.model.IdeaModel;
+import org.gradle.plugins.ide.idea.model.IdeaProject;
+import org.jetbrains.gradle.ext.ProjectSettings;
+import org.jetbrains.gradle.ext.TaskTriggersConfig;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 
-import javax.annotation.Nullable;
-import javax.annotation.ParametersAreNonnullByDefault;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -76,65 +65,41 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.Comparator;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
-import java.util.jar.JarOutputStream;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 public class RegExtension {
 
     public static final String NAME = "reg";
     public static final String JAR_NAME = "regutils";
-    public static final String FORCE_GENERATION_PROPERTY = "regForceGeneration";
     public static final JsonSlurper PARSER = new JsonSlurper();
     public static final JsonGenerator GENERATOR = new JsonGenerator.Options().build();
+    public static final String MIXINS_JSON = "regutils.mixins.json";
+    private static final String AFTER_SYNC_TASK = "regutilsIdeSync";
 
     private final Project project;
     private final RegistrationUtilsExtension.SubProject config;
-    private final Path cachePath;
     private final String group;
-
-    private final Path commonSourcesIn;
-    private final JarTask commonSourcesJar;
-
-    private final Path typeSourcesIn;
-    private final JarTask typeSourcesJar;
+    private final TaskProvider<Task> ideSync;
 
     public RegExtension(Project root, Project project, RegistrationUtilsExtension parent, RegistrationUtilsExtension.SubProject config) {
         this.project = project;
         this.config = config;
         this.group = parent.group.get();
-        this.cachePath = root.getBuildDir().toPath().resolve(RegistrationUtilsPlugin.CACHE_FOLDER)
-                .resolve(Utils.getStringFromSHA256(group)).toAbsolutePath();
+        ideSync = project.getTasks().register(AFTER_SYNC_TASK);
 
-        int random = ThreadLocalRandom.current().nextInt();
-        final Path cache = cachePath.resolve("cache");
-        final RegArtifactProvider provider = new RegArtifactProvider(group, cachePath);
-        GradleRepositoryAdapter.add(project.getRepositories(), "reg_" + random, cache.toFile(),
-                SimpleRepository.of(ArtifactProviderBuilder.begin(ArtifactIdentifier.class).provide(provider))
-        );
+        setupIdea();
 
-        final String type = config.type.get().toString();
-        commonSourcesIn = cachePath.resolve("sources").resolve(RegistrationUtilsPlugin.VERSION).resolve("common").toAbsolutePath();
-        typeSourcesIn = cachePath.resolve("sources").resolve(RegistrationUtilsPlugin.VERSION).resolve(type).toAbsolutePath();
+        // Register it now
+        joinedJarTask(config.type.get());
 
         project.getPluginManager().apply(JavaPlugin.class);
         if (root.getExtensions().getByType(RegistrationUtilsExtension.class).addsDependencies()) {
+            //noinspection Convert2Lambda
             project.getTasks().named(JavaPlugin.JAR_TASK_NAME, Jar.class, new Action<Jar>() {
                 @Override
                 public void execute(Jar jar) {
@@ -145,6 +110,7 @@ public class RegExtension {
 
         if (config.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON && root.getExtensions().getByType(RegistrationUtilsExtension.class).transformsHolderLoading()) {
             // Can't use a lambda here, see: https://docs.gradle.org/7.4/userguide/validation_problems.html#implementation_unknown
+            //noinspection Convert2Lambda
             project.getTasks().named(JavaPlugin.CLASSES_TASK_NAME, t -> t.doLast(new Action<Task>() {
                 @Override
                 public void execute(Task task) {
@@ -152,37 +118,25 @@ public class RegExtension {
                 }
             }));
         }
-        final ProjectInternal internal = (ProjectInternal) ProjectBuilder.builder()
-                .withName("reg_" + project.getName())
-                .withProjectDir(cachePath.resolve("projects").resolve(project.getName()).toFile())
-                .build();
+    }
 
-        internal.evaluate();
-
-        this.commonSourcesJar = internal.getTasks().create("regCommonSourcesJar", JarTask.class, task -> {
-            task.from(commonSourcesIn);
-            task.getDestinationDirectory().set(cachePath.toFile());
-            task.getArchiveBaseName().set(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION);
-            task.getArchiveClassifier().set("sources");
-        });
-
-        this.typeSourcesJar = internal.getTasks().create("regTypeSourcesJar", JarTask.class, task -> {
-            task.from(typeSourcesIn);
-            task.getDestinationDirectory().set(cachePath.toFile());
-            task.getArchiveBaseName().set(JAR_NAME + "-" + type + "-" + RegistrationUtilsPlugin.VERSION);
-            task.getArchiveClassifier().set("sources");
-        });
+    private void setupIdea() {
+        IdeaModel model = project.getRootProject().getExtensions().getByType(IdeaModel.class);
+        IdeaProject project = model.getProject();
+        ProjectSettings settings = ((ExtensionAware) project).getExtensions().getByType(ProjectSettings.class);
+        TaskTriggersConfig taskTriggers = ((ExtensionAware) settings).getExtensions().getByType(TaskTriggersConfig.class);
+        taskTriggers.afterSync(ideSync);
     }
 
     public void configureJarTask(Object task) {
-        configureJarTask(task, null);
+        configureJarTask(task, false);
     }
 
     public void configureSourcesJarTask(Object task) {
-        configureJarTask(task, "sources");
+        configureJarTask(task, true);
     }
 
-    public void configureJarTask(Object task, @Nullable String classifier) {
+    public void configureJarTask(Object task, boolean sources) {
         AbstractCopyTask tsk;
         if (task instanceof String) {
             final String str = (String) task;
@@ -196,57 +150,37 @@ public class RegExtension {
         } else {
             throw new RuntimeException("Cannot find task " + task);
         }
-        try {
-            final Path extDir = cachePath.resolve("ext_" + tsk.getName()).resolve(RegistrationUtilsPlugin.VERSION).resolve(config.type.get().toString());
-            deleteDir(extDir);
-            Files.createDirectories(extDir.getParent());
-            // TODO find a better solution here
-            tsk.doFirst(new Action<Task>() {
-                @Override
-                public void execute(Task t) {
-                    common();
-                    loaderSpecific();
-                    try {
-                        final Predicate<String> pred = f -> {
-                            f = f.trim();
-                            return !f.endsWith("MANIFEST.MF") && !f.contains("mod.json");
-                        };
-                        extractSubDir(getJarPath(RegistrationUtilsExtension.SubProject.Type.COMMON, classifier), extDir, pred);
-                        if (config.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON) {
-                            extractSubDir(getJarPath(config.type.get(), classifier), extDir, pred);
-                        }
-                    } catch (IOException e) {
-                        throw new RuntimeException("Exception trying to add reg to jar: ", e);
-                    }
-                }
+        final RegistrationUtilsExtension.SubProject.Type type = config.type.get();
+        if (type == RegistrationUtilsExtension.SubProject.Type.COMMON) {
+            TaskProvider<? extends GenerateTask> toInclude = sources ? sourcesJarTaskFor("common") : jarTaskFor("common");
+            tsk.dependsOn(toInclude);
+            tsk.from(project.zipTree(toInclude.get().getOutputJar()), spec -> {
+                spec.exclude("**/*MANIFEST.MF");
+                spec.exclude("*mod.json");
+            });
+        } else {
+            TaskProvider<Jar> toInclude = joinedPartialJarTask(config.type.get(), sources);
+            tsk.dependsOn(toInclude);
+            tsk.from(project.zipTree(toInclude.get().getArchiveFile()), spec -> {
+                spec.exclude("**/*MANIFEST.MF");
+                spec.exclude("*mod.json");
             });
 
-            if (config.type.get() == RegistrationUtilsExtension.SubProject.Type.FABRIC && tsk instanceof AbstractArchiveTask) {
-                final AbstractArchiveTask jar = (AbstractArchiveTask) tsk;
-                final String configName = "regutils-" + Utils.getAlphaNumericString(7) + "-" + group.replace('.', '-');
-                final String mixinsConfig = configName + ".mixins.json";
-                tsk.from(extDir, spec -> spec.rename("regutils.mixins.json", mixinsConfig)
-                        .rename("regutils.refmap.json", configName + ".refmap.json"));
-
+            if (type == RegistrationUtilsExtension.SubProject.Type.FABRIC && tsk instanceof AbstractArchiveTask) {
+                AbstractArchiveTask jar = (AbstractArchiveTask) tsk;
+                //noinspection Convert2Lambda
                 tsk.doLast(new Action<Task>() {
                     @Override
-                    @SuppressWarnings({"rawtypes", "unchecked"})
                     public void execute(Task task) {
                         try (final FileSystem fs = FileSystems.newFileSystem(jar.getArchiveFile().get().getAsFile().toPath(), (ClassLoader) null)) {
-                            final Path configPath = fs.getPath(mixinsConfig);
-                            if (Files.exists(configPath)) {
-                                final String str = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
-                                Files.write(configPath, str.replace("regutils.refmap.json", configName + ".refmap.json").getBytes(StandardCharsets.UTF_8));
-                            }
-
                             final Path fmj = fs.getPath("fabric.mod.json");
                             if (Files.exists(fmj)) {
                                 final Map map = (Map) PARSER.parse(fmj);
                                 final Object mixins = map.computeIfAbsent("mixins", o -> new ArrayList<>());
                                 if (mixins instanceof List) {
-                                    ((List) mixins).add(mixinsConfig);
+                                    ((List) mixins).add(MIXINS_JSON);
                                 } else {
-                                    map.put("mixins", Lists.newArrayList(mixins, mixinsConfig));
+                                    map.put("mixins", Arrays.asList(MIXINS_JSON));
                                 }
                                 Files.write(fmj, GENERATOR.toJson(map).getBytes(StandardCharsets.UTF_8));
                             }
@@ -256,9 +190,9 @@ public class RegExtension {
                                 final Map map = (Map) PARSER.parse(qmj);
                                 final Object mixins = map.computeIfAbsent("mixin", o -> new ArrayList<>());
                                 if (mixins instanceof List) {
-                                    ((List) mixins).add(mixinsConfig);
+                                    ((List) mixins).add(MIXINS_JSON);
                                 } else {
-                                    map.put("mixin", Lists.newArrayList(mixins, mixinsConfig));
+                                    map.put("mixin", Arrays.asList(MIXINS_JSON));
                                 }
                                 Files.write(qmj, GENERATOR.toJson(map).getBytes(StandardCharsets.UTF_8));
                             }
@@ -267,56 +201,87 @@ public class RegExtension {
                         }
                     }
                 });
-            } else {
-                tsk.from(extDir, spec -> spec.exclude("regutils.mixins.json", "regutils.refmap.json"));
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private void extractSubDir(Path zipFile, Path outputPath, Predicate<String> predicate)
-            throws IOException {
-        // Open the file
-        try (final ZipFile file = new ZipFile(zipFile.toFile())) {
-            // Get file entries
-            final Enumeration<? extends ZipEntry> entries = file.entries();
-
-            // Iterate over entries
-            while (entries.hasMoreElements()) {
-                final ZipEntry entry = entries.nextElement();
-                // Make sure we want the file
-                if (predicate.test(entry.getName()) && !entry.isDirectory()) {
-                    // Create the file
-                    final InputStream is = file.getInputStream(entry);
-                    final BufferedInputStream bis = new BufferedInputStream(is);
-                    final Path uncompressedFilePath = outputPath.resolve(entry.getName());
-                    Files.createDirectories(uncompressedFilePath.getParent());
-                    final OutputStream fileOutput = Files.newOutputStream(uncompressedFilePath);
-                    while (bis.available() > 0) {
-                        fileOutput.write(bis.read());
-                    }
-                    fileOutput.close();
-                }
             }
         }
     }
 
-    @SuppressWarnings("ALL")
+    @SuppressWarnings("UnusedReturnValue")
     public Dependency common() {
-        final Dependency dep = project.getDependencies().create(dependencyNotation(null));
-        maybeCreateJar(null, commonSourcesIn, "common", "com.matyrobbrt.registrationutils", commonSourcesJar);
-        return dep;
+        return regDependency("common");
     }
 
-    @SuppressWarnings("ALL")
+    @SuppressWarnings("UnusedReturnValue")
     public Dependency loaderSpecific() {
         final RegistrationUtilsExtension.SubProject.Type type = config.type.get();
-        if (type == RegistrationUtilsExtension.SubProject.Type.COMMON)
-            return common();
-        final Dependency dep = project.getDependencies().create(dependencyNotation(type));
-        maybeCreateJar(type, typeSourcesIn, type.toString(), "com.matyrobbrt.registrationutils", typeSourcesJar);
-        return dep;
+        return regDependency(type.toString());
+    }
+
+    private Dependency regDependency(String type) {
+        final ConfigurableFileCollection files = project.files();
+        TaskProvider<Jar> task = combinedJarTaskFor(type);
+        files.builtBy(task);
+        files.from(task.map(Jar::getArchiveFile));
+        return project.getDependencies().create(files);
+    }
+
+    private TaskProvider<Jar> commonJarTask() {
+        return combinedJarTaskFor("common");
+    }
+
+    private TaskProvider<Jar> loaderSpecificJarTask() {
+        return combinedJarTaskFor(config.type.get().toString());
+    }
+
+    private TaskProvider<GenerateArtifactTask> jarTaskFor(String type) {
+        TaskProvider<GenerateArtifactTask> task;
+        try {
+            task = project.getTasks().named(type +"RegJar", GenerateArtifactTask.class);
+        } catch (UnknownDomainObjectException ignored) {
+            task = project.getTasks().register(type +"RegJar", GenerateArtifactTask.class, t -> {
+                t.getTargetGroup().set(group);
+                t.getResource().set(type);
+            });
+            TaskProvider<GenerateArtifactTask> finalTask = task;
+            ideSync.configure(t -> t.dependsOn(finalTask));
+        }
+        return task;
+    }
+
+    private TaskProvider<GenerateSourcesTask> sourcesJarTaskFor(String type) {
+        TaskProvider<GenerateSourcesTask> task;
+        try {
+            task = project.getTasks().named(type +"RegSourcesJar", GenerateSourcesTask.class);
+        } catch (UnknownDomainObjectException ignored) {
+            task = project.getTasks().register(type +"RegSourcesJar", GenerateSourcesTask.class, t -> {
+                t.getTargetGroup().set(group);
+                t.getResource().set(type);
+            });
+            TaskProvider<GenerateSourcesTask> finalTask = task;
+            ideSync.configure(t -> t.dependsOn(finalTask));
+        }
+        return task;
+    }
+
+    private TaskProvider<Jar> combinedJarTaskFor(String type) {
+        TaskProvider<Jar> combined;
+        try {
+            combined = project.getTasks().named(type+"RegCombinedJar", Jar.class);
+        } catch (UnknownDomainObjectException ignored) {
+            TaskProvider<GenerateArtifactTask> classes = jarTaskFor(type);
+            TaskProvider<GenerateSourcesTask> sources = sourcesJarTaskFor(type);
+            combined = project.getTasks().register(type+"RegCombinedJar", Jar.class, t -> {
+                t.getArchiveBaseName().set(JAR_NAME + "-combined-" + type);
+                t.getArchiveVersion().set(RegistrationUtilsPlugin.VERSION);
+                t.getDestinationDirectory().set(project.getLayout().getBuildDirectory().dir("registrationutils"));
+                t.from(project.zipTree(classes.get().getOutputJar()));
+                t.from(project.zipTree(sources.get().getOutputJar()));
+                t.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE);
+                t.dependsOn(classes, sources);
+            });
+            TaskProvider<Jar> finalCombined = combined;
+            ideSync.configure(t -> t.dependsOn(finalCombined));
+        }
+        return combined;
     }
 
     @SuppressWarnings("unused")
@@ -325,205 +290,57 @@ public class RegExtension {
         if (type == RegistrationUtilsExtension.SubProject.Type.COMMON)
             return common();
 
-        final Dependency dep = project.getDependencies().create(group + ":" + JAR_NAME + "-joined-" + type + ":" + RegistrationUtilsPlugin.VERSION);
-        common(); // Make sure common exists
-        final Path commonJarPath = getJarPath(null, null);
-        loaderSpecific(); // Make sure type exists
-        final Path typeJarPath = getJarPath(type, null);
-        final Path outPath = cachePath.resolve(JAR_NAME + "-joined-" + type + "-" + RegistrationUtilsPlugin.VERSION + ".jar");
+        TaskProvider<Jar> joinedJar = joinedJarTask(type);
+        final ConfigurableFileCollection files = project.files();
+        files.builtBy(joinedJar);
+        files.from(joinedJar.map(Jar::getArchiveFile));
+        return project.getDependencies().create(files);
+    }
 
-        if (Files.exists(outPath) && !(project.hasProperty(FORCE_GENERATION_PROPERTY) || project.getGradle().getStartParameter().isRefreshDependencies())) {
-            return dep;
-        }
-
+    private TaskProvider<Jar> joinedJarTask(RegistrationUtilsExtension.SubProject.Type type) {
+        TaskProvider<Jar> joinedJar;
         try {
-            Files.deleteIfExists(outPath);
-            Files.createFile(outPath);
-            try (final JarFile commonJar = new JarFile(commonJarPath.toFile());
-                 final JarFile typeJar = new JarFile(typeJarPath.toFile());
-                 final JarOutputStream out = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(outPath.toFile())))) {
-                copyEntries(null, commonJar, out);
-                copyEntries(commonJar, typeJar, out);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            joinedJar = project.getTasks().named("joinedRegJar", Jar.class);
+        } catch (UnknownDomainObjectException ignored) {
+            TaskProvider<Jar> common = commonJarTask();
+            TaskProvider<Jar> loaderSpecific = loaderSpecificJarTask();
+            joinedJar = project.getTasks().register("joinedRegJar", Jar.class, t -> {
+                t.dependsOn(common, loaderSpecific);
+                t.getArchiveBaseName().set(JAR_NAME + "-joined-" + type);
+                t.getArchiveVersion().set(RegistrationUtilsPlugin.VERSION);
+                t.getDestinationDirectory().set(project.getLayout().getBuildDirectory().dir("registrationutils"));
+                t.from(project.zipTree(common.get().getArchiveFile()));
+                t.from(project.zipTree(loaderSpecific.get().getArchiveFile()));
+                t.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE);
+            });
+            TaskProvider<Jar> finalJoinedJar = joinedJar;
+            ideSync.configure(t -> t.dependsOn(finalJoinedJar));
         }
-        return dep;
+        return joinedJar;
     }
 
-    @ParametersAreNonnullByDefault
-    private static void copyEntries(@Nullable JarFile other, JarFile in, JarOutputStream out) throws IOException {
-        for (final Enumeration<JarEntry> entries = in.entries(); entries.hasMoreElements(); ) {
-            final JarEntry entry = entries.nextElement();
-            if (other == null || other.getEntry(entry.getName()) == null) {
-                // Doesn't exist already
-                out.putNextEntry(entry);
-                IOUtils.copy(in.getInputStream(entry), out);
-                out.closeEntry();
-            }
+
+
+    private TaskProvider<Jar> joinedPartialJarTask(RegistrationUtilsExtension.SubProject.Type type, boolean sources) {
+        TaskProvider<Jar> joinedJar;
+        try {
+            joinedJar = project.getTasks().named("joinedRegJar", Jar.class);
+        } catch (UnknownDomainObjectException ignored) {
+            TaskProvider<? extends GenerateTask> common = sources ? sourcesJarTaskFor("common") : jarTaskFor("common");
+            TaskProvider<? extends GenerateTask> loaderSpecific = sources ? sourcesJarTaskFor(type.toString()) : jarTaskFor(type.toString());
+            joinedJar = project.getTasks().register("joinedRegJar", Jar.class, t -> {
+                t.getArchiveBaseName().set(JAR_NAME + (sources ? "-joined-sources-" : "-joined-classes-") + type);
+                t.getArchiveVersion().set(RegistrationUtilsPlugin.VERSION);
+                t.getDestinationDirectory().set(project.getLayout().getBuildDirectory().dir("registrationutils"));
+                t.from(project.zipTree(common.get().getOutputJar()));
+                t.from(project.zipTree(loaderSpecific.get().getOutputJar()));
+                t.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE);
+                t.dependsOn(common, loaderSpecific);
+            });
+            TaskProvider<Jar> finalJoinedJar = joinedJar;
+            ideSync.configure(t -> t.dependsOn(finalJoinedJar));
         }
-    }
-
-    /**
-     * @return the path of the created jar
-     */
-    @ParametersAreNonnullByDefault
-    private Path maybeCreateJar(
-            @Nullable RegistrationUtilsExtension.SubProject.Type type,
-            Path sourcesInPath,
-            String resource,
-            String inGroup,
-            @Nullable JarTask sourcesJarTask
-    ) {
-        final Path jarPath = getJarPath(type, null);
-        if (Files.exists(jarPath) && !(project.hasProperty(FORCE_GENERATION_PROPERTY) || project.getGradle().getStartParameter().isRefreshDependencies())) {
-            attachSources(type);
-            return jarPath;
-        }
-
-        // Let's create the deps
-        {
-            // Start with relocating the jar
-            try {
-                deleteDir(sourcesInPath);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            final boolean res = RelocateResourceTask.relocate(
-                    project.getLogger(),
-                    RelocateResourceTask.getResourceDir(resource + "-sources.zip"),
-                    sourcesInPath,
-                    inGroup,
-                    group
-            );
-            if (!res) {
-                throw new RuntimeException("Relocation failed!");
-            }
-        }
-
-        {
-            try {
-                final String jarName = (type == null ? "common" : type.toString()) + "-" + RegistrationUtilsPlugin.VERSION + ".jar";
-                final Path finishedTemp = cachePath.resolve("comp").resolve(jarName);
-                Files.createDirectories(finishedTemp.getParent());
-                Files.deleteIfExists(finishedTemp);
-                final Path jar = cachePath.resolve("befcompiled").resolve(jarName);
-                Files.createDirectories(jar.getParent());
-                Files.deleteIfExists(jar);
-                Files.copy(Objects.requireNonNull(RegistrationUtilsExtension.class.getResourceAsStream("/" + resource + ".zip")), jar, StandardCopyOption.REPLACE_EXISTING);
-                final JarRelocator relocator = new JarRelocator(jar.toFile(), finishedTemp.toFile(), Collections.singleton(new Relocation(inGroup, group)));
-                relocator.run();
-
-                final Pattern groupPattern = Pattern.compile(inGroup.replace(".", "\\."));
-                final Pattern groupPatternND = Pattern.compile(inGroup.replace('.', '/'));
-
-                // Now we gotta rename META-INFs or (mixin) jsons
-                try (JarOutputStream out = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(jarPath.toFile())))) {
-                    try (JarFile in = new JarFile(finishedTemp.toFile())) {
-                        for (Enumeration<JarEntry> entries = in.entries(); entries.hasMoreElements(); ) {
-                            final JarEntry entry = entries.nextElement();
-
-                            final String name = entry.getName();
-                            final InputStream is = in.getInputStream(entry);
-
-                            final boolean isService = name.startsWith("META-INF/services/");
-                            final boolean isJson = name.endsWith(".json");
-                            if (!(isService || isJson) || entry.isDirectory()) {
-                                out.putNextEntry(entry);
-                                IOUtils.copy(is, out);
-                                out.closeEntry();
-                                continue;
-                            }
-
-                            if (isService) {
-                                String serviceName = name.substring(18);
-                                final Matcher nameMatcher = groupPattern.matcher(serviceName);
-                                if (!nameMatcher.find()) {
-                                    out.putNextEntry(entry);
-                                    IOUtils.copy(is, out);
-                                    out.closeEntry();
-                                    continue;
-                                }
-                                serviceName = nameMatcher.replaceAll(group);
-                                String content = RelocateResourceTask.readBytes(is).toString();
-                                content = groupPattern.matcher(content).replaceAll(group);
-
-                                final JarEntry newEntry = new JarEntry("META-INF/services/" + serviceName);
-                                out.putNextEntry(newEntry);
-                                out.write(content.getBytes(StandardCharsets.UTF_8));
-                                out.closeEntry();
-                            } else {
-                                String content = RelocateResourceTask.readBytes(is).toString();
-                                content = groupPattern.matcher(content).replaceAll(group);
-                                content = groupPatternND.matcher(content).replaceAll(group.replace('.', '/'));
-
-                                final JarEntry newEntry = new JarEntry(name);
-                                out.putNextEntry(newEntry);
-                                out.write(content.getBytes(StandardCharsets.UTF_8));
-                                out.closeEntry();
-                            }
-                        }
-                    }
-                }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        {
-            // Sources
-            if (sourcesJarTask != null) {
-                sourcesJarTask.copy();
-            }
-
-            attachSources(type);
-            return jarPath;
-        }
-    }
-
-    private void attachSources(RegistrationUtilsExtension.SubProject.Type type) {
-        final String jarName = cachePath.relativize(getJarPath(type, null)).toString();
-        final Path sourcesJar = getJarPath(type, "sources").toAbsolutePath();
-
-        if (project.getPlugins().hasPlugin("eclipse")) {
-            final EclipseModel eclipse = project.getExtensions().getByType(EclipseModel.class);
-            eclipse.classpath(cp -> cp.file(file -> file.whenMerged((Classpath classpath) -> classpath.getEntries().stream()
-                    .filter(Library.class::isInstance)
-                    .map(Library.class::cast)
-                    .filter(lib -> lib.getPath().contains(jarName))
-                    .filter(lib -> lib.getSourcePath() == null)
-                    .findFirst()
-                    .ifPresent(lib -> lib.setSourcePath(classpath.fileReference(sourcesJar))))));
-        }
-
-        if (project.getPlugins().hasPlugin("idea")) {
-            final IdeaPlugin idea = project.getPlugins().getPlugin(IdeaPlugin.class);
-            idea.getModel().module(mod -> mod.iml(iml -> iml.whenMerged($ -> idea.getModel().getModule().resolveDependencies()
-                    .stream()
-                    .filter(ModuleLibrary.class::isInstance)
-                    .map(ModuleLibrary.class::cast)
-                    .filter(lib -> lib.getClasses().stream().anyMatch(p -> p.getUrl().contains(jarName)))
-                    .filter(lib -> lib.getSources().isEmpty())
-                    .findFirst()
-                    .ifPresent(lib -> lib.getSources().add(new org.gradle.plugins.ide.idea.model.Path("jar://" + sourcesJar + "!/"))))));
-        }
-    }
-
-    private String dependencyNotation(RegistrationUtilsExtension.SubProject.Type type) {
-        if (type == null) {
-            return group + ":" + JAR_NAME + ":" + RegistrationUtilsPlugin.VERSION;
-        } else {
-            return group + ":" + JAR_NAME + "-" + type + ":" + RegistrationUtilsPlugin.VERSION;
-        }
-    }
-
-    public Path getJarPath(RegistrationUtilsExtension.SubProject.Type type, String classifier) {
-        String actualClassifier = classifier == null || classifier.isEmpty() ? "" : "-" + classifier;
-        if (type == null || type == RegistrationUtilsExtension.SubProject.Type.COMMON) {
-            return cachePath.resolve(JAR_NAME + "-" + RegistrationUtilsPlugin.VERSION + actualClassifier + ".jar");
-        } else {
-            return cachePath.resolve(JAR_NAME + "-" + type + "-" + RegistrationUtilsPlugin.VERSION + actualClassifier + ".jar");
-        }
+        return joinedJar;
     }
 
     private void handleTransformation(Path classesOut) {
@@ -579,18 +396,4 @@ public class RegExtension {
                 .forEach(File::delete);
     }
 
-    public static class JarTask extends Jar {
-        @Override
-        public void copy() {
-            super.copy();
-        }
-
-        public void makeJar(Consumer<Exception> exception) {
-            try {
-                copy();
-            } catch (Exception i) {
-                exception.accept(i);
-            }
-        }
-    }
 }

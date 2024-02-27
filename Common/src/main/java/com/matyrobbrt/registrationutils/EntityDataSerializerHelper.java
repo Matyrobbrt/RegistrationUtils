@@ -33,8 +33,6 @@ import net.minecraft.network.syncher.EntityDataSerializer;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.resources.ResourceLocation;
 
-import javax.annotation.ParametersAreNonnullByDefault;
-
 /**
  * A helper used to register custom {@link EntityDataSerializer EntityDataSerializers}.
  * <p>
@@ -46,7 +44,6 @@ import javax.annotation.ParametersAreNonnullByDefault;
  * public static void loadClass(){}
  * }</pre>
  */
-@ParametersAreNonnullByDefault
 public interface EntityDataSerializerHelper {
 
     /**
