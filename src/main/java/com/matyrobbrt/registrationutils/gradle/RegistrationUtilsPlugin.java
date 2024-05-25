@@ -41,12 +41,12 @@ public class RegistrationUtilsPlugin implements Plugin<Project> {
         VERSION = ver == null ? "dev" : ver;
     }
 
-    public static final String CACHE_FOLDER = "registrationutils";
-
     public static final String CONFIGURATION_NAME = "registrationUtils";
 
     @Override
     public void apply(Project project) {
+        project.getPluginManager().apply("org.jetbrains.gradle.plugin.idea-ext");
+
         final RegistrationUtilsExtension ext = project.getExtensions().create(RegistrationUtilsExtension.NAME, RegistrationUtilsExtension.class, project);
         project.afterEvaluate($$ -> {
             ext.getProjects().forEach(sub -> {
