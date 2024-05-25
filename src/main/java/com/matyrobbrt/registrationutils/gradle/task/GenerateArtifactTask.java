@@ -12,9 +12,12 @@ import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.TaskAction;
+import org.slf4j.Logger;
 
 import javax.inject.Inject;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
@@ -32,6 +37,8 @@ import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public abstract class GenerateArtifactTask extends DefaultTask {
 
@@ -62,9 +69,9 @@ public abstract class GenerateArtifactTask extends DefaultTask {
         if (Files.exists(sourcesInPath)) {
             getFileSystemOperations().delete(spec -> spec.delete(sourcesInPath));
         }
-        final boolean res = RelocateResourceTask.relocate(
+        final boolean res = relocate(
                 getLogger(),
-                RelocateResourceTask.getResourceDir(getResource().get() + "-sources.zip"),
+                getResourceDir(getResource().get() + "-sources.zip"),
                 sourcesInPath,
                 getInitialGroup().get(),
                 getTargetGroup().get()
@@ -118,7 +125,7 @@ public abstract class GenerateArtifactTask extends DefaultTask {
                                     continue;
                                 }
                                 serviceName = nameMatcher.replaceAll(getTargetGroup().get());
-                                String content = RelocateResourceTask.readBytes(is).toString();
+                                String content = readBytes(is).toString();
                                 content = groupPattern.matcher(content).replaceAll(getTargetGroup().get());
 
                                 final JarEntry newEntry = new JarEntry("META-INF/services/" + serviceName);
@@ -126,7 +133,7 @@ public abstract class GenerateArtifactTask extends DefaultTask {
                                 out.write(content.getBytes(StandardCharsets.UTF_8));
                                 out.closeEntry();
                             } else {
-                                String content = RelocateResourceTask.readBytes(is).toString();
+                                String content = readBytes(is).toString();
                                 content = groupPattern.matcher(content).replaceAll(getTargetGroup().get());
                                 content = groupPatternND.matcher(content).replaceAll(getTargetGroup().get().replace('.', '/'));
 
@@ -159,6 +166,83 @@ public abstract class GenerateArtifactTask extends DefaultTask {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    private static boolean relocate(Logger logger, ZipInputStream input, Path output, String fromGroup, String toGroup) {
+        final Pattern regex = Pattern.compile(fromGroup.replace(".", "\\."));
+        try {
+            forEachEntry(input, (name, data) -> {
+                final FileData fileData = FileData.create(name);
+                if (fileData.fileName.equals("regutils.refmap.json")) {
+                    final String str = data.toString();
+                    Files.writeString(output.resolve(fileData.directory.isEmpty() ? fileData.fileName : fileData.directory + "/" + fileData.fileName),
+                            str.replace(fromGroup.replace('.', '/'), toGroup.replace('.', '/')));
+                    return;
+                }
+
+                final String relocatedName = regex.matcher(fileData.fileName).replaceAll(toGroup);
+                final String pkg = fileData.directory.replace('/', '.');
+                Path path = output.resolve(fileData.directory.isEmpty() ? relocatedName : regex.matcher(pkg).replaceAll(toGroup).replace('.', '/') + "/" + relocatedName);
+                if (path.getParent() != null) {
+                    Files.createDirectories(path.getParent());
+                }
+                Files.deleteIfExists(path);
+                if (fileData.fileName.endsWith(".class")) { // Don't process class files
+                    path = output.resolve(name);
+                    Files.copy(new ByteArrayInputStream(data.toByteArray()), path, StandardCopyOption.REPLACE_EXISTING);
+                } else {
+                    Files.writeString(path, regex.matcher(data.toString()).replaceAll(toGroup), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+                }
+            });
+        } catch (IOException e) {
+            logger.error("Exception trying to relocate resource: ", e);
+            return false;
+        }
+        return true;
+    }
+
+    private static ByteArrayOutputStream readBytes(InputStream stream) throws IOException {
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        int len;
+        while ((len = stream.read()) > 0) {
+            bos.write(len);
+        }
+        return bos;
+    }
+
+    private static ZipInputStream getResourceDir(String zip) {
+        final InputStream stream = Objects.requireNonNull(RegistrationUtilsPlugin.class.getResourceAsStream("/" + zip));
+        return new ZipInputStream(stream);
+    }
+
+    private static <X extends Exception> void forEachEntry(ZipInputStream stream, ThrowingBiConsumer<String, ByteArrayOutputStream, X> action) throws X, IOException {
+        ZipEntry entry;
+        while ((entry = stream.getNextEntry()) != null) {
+            if (!entry.isDirectory()) {
+                try (final ByteArrayOutputStream bos = readBytes(stream)) {
+                    action.accept(entry.getName(), bos);
+                }
+            }
+        }
+    }
+
+    private interface ThrowingBiConsumer<A, B, X extends Exception> {
+        void accept(A a, B b) throws X;
+    }
+
+    private static class FileData {
+        public final String fileName, directory;
+        public FileData(String fileName, String directory) {
+            this.fileName = fileName;
+            this.directory = directory;
+        }
+
+        public static FileData create(String name) {
+            final String[] split = name.split("/");
+            final String fileName = split[split.length - 1];
+            final String dir = split.length == 1 ? "" : String.join("/", Arrays.asList(split).subList(0, split.length - 1));
+            return new FileData(fileName, dir);
         }
     }
 }
