@@ -30,6 +30,8 @@ package com.matyrobbrt.registrationutils.gradle;
 
 import com.matyrobbrt.registrationutils.gradle.holderreg.HolderScanner;
 import com.matyrobbrt.registrationutils.gradle.task.GenerateArtifactTask;
+import com.matyrobbrt.registrationutils.gradle.task.GenerateSourcesTask;
+import com.matyrobbrt.registrationutils.gradle.task.GenerateTask;
 import groovy.json.JsonGenerator;
 import groovy.json.JsonSlurper;
 import org.gradle.api.Action;
@@ -150,27 +152,18 @@ public class RegExtension {
         }
         final RegistrationUtilsExtension.SubProject.Type type = config.type.get();
         if (type == RegistrationUtilsExtension.SubProject.Type.COMMON) {
-            tsk.dependsOn(commonJarTask());
-            tsk.from(project.zipTree(commonJarTask().get().getOutputJar()), spec -> {
+            TaskProvider<? extends GenerateTask> toInclude = sources ? sourcesJarTaskFor("common") : jarTaskFor("common");
+            tsk.dependsOn(toInclude);
+            tsk.from(project.zipTree(toInclude.get().getOutputJar()), spec -> {
                 spec.exclude("**/*MANIFEST.MF");
                 spec.exclude("*mod.json");
-                if (sources) {
-                    spec.exclude("**/*.class");
-                } else {
-                    spec.exclude("**/*.java");
-                }
             });
         } else {
-            tsk.dependsOn(joinedJarTask(type));
-            tsk.from(project.zipTree(joinedJarTask(type).get().getArchiveFile()), spec -> {
+            TaskProvider<Jar> toInclude = joinedPartialJarTask(config.type.get(), sources);
+            tsk.dependsOn(toInclude);
+            tsk.from(project.zipTree(toInclude.get().getArchiveFile()), spec -> {
                 spec.exclude("**/*MANIFEST.MF");
                 spec.exclude("*mod.json");
-                tsk.dependsOn(joinedJarTask(type));
-                if (sources) {
-                    spec.exclude("**/*.class");
-                } else {
-                    spec.exclude("**/*.java");
-                }
             });
 
             if (type == RegistrationUtilsExtension.SubProject.Type.FABRIC && tsk instanceof AbstractArchiveTask jar) {
@@ -230,12 +223,12 @@ public class RegExtension {
         return project.getDependencies().create(files);
     }
 
-    private TaskProvider<GenerateArtifactTask> commonJarTask() {
-        return jarTaskFor("common");
+    private TaskProvider<Jar> commonJarTask() {
+        return combinedJarTaskFor("common");
     }
 
-    private TaskProvider<GenerateArtifactTask> loaderSpecificJarTask() {
-        return jarTaskFor(config.type.get().toString());
+    private TaskProvider<Jar> loaderSpecificJarTask() {
+        return combinedJarTaskFor(config.type.get().toString());
     }
 
     private TaskProvider<GenerateArtifactTask> jarTaskFor(String type) {
@@ -251,6 +244,44 @@ public class RegExtension {
             ideSync.configure(t -> t.dependsOn(finalTask));
         }
         return task;
+    }
+
+    private TaskProvider<GenerateSourcesTask> sourcesJarTaskFor(String type) {
+        TaskProvider<GenerateSourcesTask> task;
+        try {
+            task = project.getTasks().named(type +"RegSourcesJar", GenerateSourcesTask.class);
+        } catch (UnknownDomainObjectException ignored) {
+            task = project.getTasks().register(type +"RegSourcesJar", GenerateSourcesTask.class, t -> {
+                t.getTargetGroup().set(group);
+                t.getResource().set(type);
+            });
+            TaskProvider<GenerateSourcesTask> finalTask = task;
+            ideSync.configure(t -> t.dependsOn(finalTask));
+        }
+        return task;
+    }
+
+    private TaskProvider<Jar> combinedJarTaskFor(String type) {
+        TaskProvider<Jar> combined;
+        try {
+            combined = project.getTasks().named(type+"RegCombinedJar", Jar.class);
+        } catch (UnknownDomainObjectException ignored) {
+            var classes = jarTaskFor(type);
+            var sources = sourcesJarTaskFor(type);
+            combined = project.getTasks().register(type+"RegCombinedJar", Jar.class, t -> {
+                t.dependsOn(common(), loaderSpecific());
+                t.getArchiveBaseName().set(JAR_NAME + "-combined-" + type);
+                t.getArchiveVersion().set(RegistrationUtilsPlugin.VERSION);
+                t.getDestinationDirectory().set(project.getLayout().getBuildDirectory().dir("registrationutils"));
+                t.from(project.zipTree(classes.get().getOutputJar()));
+                t.from(project.zipTree(sources.get().getOutputJar()));
+                t.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE);
+                t.dependsOn(classes, sources);
+            });
+            TaskProvider<Jar> finalCombined = combined;
+            ideSync.configure(t -> t.dependsOn(finalCombined));
+        }
+        return combined;
     }
 
     @SuppressWarnings("unused")
@@ -271,17 +302,42 @@ public class RegExtension {
         try {
             joinedJar = project.getTasks().named("joinedRegJar", Jar.class);
         } catch (UnknownDomainObjectException ignored) {
-            common();
-            loaderSpecific();
+            var common = commonJarTask();
+            var loaderSpecific = loaderSpecificJarTask();
             joinedJar = project.getTasks().register("joinedRegJar", Jar.class, t -> {
                 t.dependsOn(common(), loaderSpecific());
                 t.getArchiveBaseName().set(JAR_NAME + "-joined-" + type);
                 t.getArchiveVersion().set(RegistrationUtilsPlugin.VERSION);
                 t.getDestinationDirectory().set(project.getLayout().getBuildDirectory().dir("registrationutils"));
-                t.from(project.zipTree(commonJarTask().get().getOutputJar()));
-                t.from(project.zipTree(loaderSpecificJarTask().get().getOutputJar()));
+                t.from(project.zipTree(common.get().getArchiveFile()));
+                t.from(project.zipTree(loaderSpecific.get().getArchiveFile()));
                 t.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE);
-                t.dependsOn(commonJarTask(), loaderSpecificJarTask());
+                t.dependsOn(common, loaderSpecific);
+            });
+            TaskProvider<Jar> finalJoinedJar = joinedJar;
+            ideSync.configure(t -> t.dependsOn(finalJoinedJar));
+        }
+        return joinedJar;
+    }
+
+
+
+    private @NotNull TaskProvider<Jar> joinedPartialJarTask(RegistrationUtilsExtension.SubProject.Type type, boolean sources) {
+        TaskProvider<Jar> joinedJar;
+        try {
+            joinedJar = project.getTasks().named("joinedRegJar", Jar.class);
+        } catch (UnknownDomainObjectException ignored) {
+            var common = sources ? sourcesJarTaskFor("common") : jarTaskFor("common");
+            var loaderSpecific = sources ? sourcesJarTaskFor(type.toString()) : jarTaskFor(type.toString());
+            joinedJar = project.getTasks().register("joinedRegJar", Jar.class, t -> {
+                t.dependsOn(common(), loaderSpecific());
+                t.getArchiveBaseName().set(JAR_NAME + (sources ? "-joined-sources-" : "-joined-classes-") + type);
+                t.getArchiveVersion().set(RegistrationUtilsPlugin.VERSION);
+                t.getDestinationDirectory().set(project.getLayout().getBuildDirectory().dir("registrationutils"));
+                t.from(project.zipTree(common.get().getOutputJar()));
+                t.from(project.zipTree(loaderSpecific.get().getOutputJar()));
+                t.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE);
+                t.dependsOn(common, loaderSpecific);
             });
             TaskProvider<Jar> finalJoinedJar = joinedJar;
             ideSync.configure(t -> t.dependsOn(finalJoinedJar));
