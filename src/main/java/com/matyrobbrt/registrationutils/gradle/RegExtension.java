@@ -268,7 +268,6 @@ public class RegExtension {
             var classes = jarTaskFor(type);
             var sources = sourcesJarTaskFor(type);
             combined = project.getTasks().register(type+"RegCombinedJar", Jar.class, t -> {
-                t.dependsOn(common(), loaderSpecific());
                 t.getArchiveBaseName().set(JAR_NAME + "-combined-" + type);
                 t.getArchiveVersion().set(RegistrationUtilsPlugin.VERSION);
                 t.getDestinationDirectory().set(project.getLayout().getBuildDirectory().dir("registrationutils"));
