@@ -304,14 +304,13 @@ public class RegExtension {
             var common = commonJarTask();
             var loaderSpecific = loaderSpecificJarTask();
             joinedJar = project.getTasks().register("joinedRegJar", Jar.class, t -> {
-                t.dependsOn(common(), loaderSpecific());
+                t.dependsOn(common, loaderSpecific);
                 t.getArchiveBaseName().set(JAR_NAME + "-joined-" + type);
                 t.getArchiveVersion().set(RegistrationUtilsPlugin.VERSION);
                 t.getDestinationDirectory().set(project.getLayout().getBuildDirectory().dir("registrationutils"));
                 t.from(project.zipTree(common.get().getArchiveFile()));
                 t.from(project.zipTree(loaderSpecific.get().getArchiveFile()));
                 t.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE);
-                t.dependsOn(common, loaderSpecific);
             });
             TaskProvider<Jar> finalJoinedJar = joinedJar;
             ideSync.configure(t -> t.dependsOn(finalJoinedJar));
@@ -329,7 +328,6 @@ public class RegExtension {
             var common = sources ? sourcesJarTaskFor("common") : jarTaskFor("common");
             var loaderSpecific = sources ? sourcesJarTaskFor(type.toString()) : jarTaskFor(type.toString());
             joinedJar = project.getTasks().register("joinedRegJar", Jar.class, t -> {
-                t.dependsOn(common(), loaderSpecific());
                 t.getArchiveBaseName().set(JAR_NAME + (sources ? "-joined-sources-" : "-joined-classes-") + type);
                 t.getArchiveVersion().set(RegistrationUtilsPlugin.VERSION);
                 t.getDestinationDirectory().set(project.getLayout().getBuildDirectory().dir("registrationutils"));
