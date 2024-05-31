@@ -216,9 +216,9 @@ public class RegExtension {
 
     private Dependency regDependency(String type) {
         final ConfigurableFileCollection files = project.files();
-        TaskProvider<GenerateArtifactTask> task = jarTaskFor(type);
+        TaskProvider<Jar> task = combinedJarTaskFor(type);
         files.builtBy(task);
-        files.from(task.map(GenerateArtifactTask::getOutputJar));
+        files.from(task.map(Jar::getArchiveFile));
         return project.getDependencies().create(files);
     }
 

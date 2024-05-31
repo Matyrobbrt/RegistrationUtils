@@ -60,7 +60,7 @@ public class RegistrationUtilsPlugin implements Plugin<Project> {
                 final RegExtension reg = proj.getExtensions().create(ext.extensionName.get(), RegExtension.class, project, proj, ext, sub);
                 if (ext.addsDependencies()) {
                     final Configuration regUtilsConfig = proj.getConfigurations().maybeCreate(CONFIGURATION_NAME);
-                    regUtilsConfig.getDependencies().add(reg.common());
+                    regUtilsConfig.getDependencies().add(reg.joined());
 
                     final Configuration compConfig = proj.getConfigurations().findByName(JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME);
                     if (compConfig != null) {
