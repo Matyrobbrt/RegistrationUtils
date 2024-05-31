@@ -120,8 +120,7 @@ public class RegExtension {
     }
 
     private void setupIdea() {
-        project.getPluginManager().apply("org.jetbrains.gradle.plugin.idea-ext");
-        IdeaModel model = project.getExtensions().getByType(IdeaModel.class);
+        IdeaModel model = project.getRootProject().getExtensions().getByType(IdeaModel.class);
         var project = model.getProject();
         ProjectSettings settings = ((ExtensionAware) project).getExtensions().getByType(ProjectSettings.class);
         TaskTriggersConfig taskTriggers = ((ExtensionAware) settings).getExtensions().getByType(TaskTriggersConfig.class);
