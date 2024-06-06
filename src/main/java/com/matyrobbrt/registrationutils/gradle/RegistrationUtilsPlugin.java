@@ -32,6 +32,7 @@ import org.gradle.api.Plugin;
 import org.gradle.api.Project;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.plugins.JavaPlugin;
+import org.gradle.api.plugins.UnknownPluginException;
 
 public class RegistrationUtilsPlugin implements Plugin<Project> {
 
@@ -41,12 +42,19 @@ public class RegistrationUtilsPlugin implements Plugin<Project> {
         VERSION = ver == null ? "dev" : ver;
     }
 
-    public static final String CACHE_FOLDER = "registrationutils";
-
     public static final String CONFIGURATION_NAME = "registrationUtils";
+
+    public static final String RUNTIME_CONFIGURATION_NAME = "registrationUtilsRuntime";
 
     @Override
     public void apply(Project project) {
+        try {
+            project.getRootProject().getPluginManager().apply("org.jetbrains.gradle.plugin.idea-ext");
+        } catch (UnknownPluginException e) {
+            // Ensures that classpath errors due to multiple subprojects trying to add this are impossible
+            throw new IllegalStateException("The RegistrationUtils plugin requires the 'org.jetbrains.gradle.plugin.idea-ext' plugin to be available to the root project plugin classpath.", e);
+        }
+
         final RegistrationUtilsExtension ext = project.getExtensions().create(RegistrationUtilsExtension.NAME, RegistrationUtilsExtension.class, project);
         project.afterEvaluate($$ -> {
             ext.getProjects().forEach(sub -> {
@@ -55,6 +63,8 @@ public class RegistrationUtilsPlugin implements Plugin<Project> {
                 if (ext.addsDependencies()) {
                     final Configuration regUtilsConfig = proj.getConfigurations().maybeCreate(CONFIGURATION_NAME);
                     regUtilsConfig.getDependencies().add(reg.common());
+                    final Configuration regUtilsRuntimeConfig = proj.getConfigurations().maybeCreate(RUNTIME_CONFIGURATION_NAME);
+                    regUtilsRuntimeConfig.getDependencies().add(reg.joined());
 
                     final Configuration compConfig = proj.getConfigurations().findByName(JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME);
                     if (compConfig != null) {
@@ -69,7 +79,7 @@ public class RegistrationUtilsPlugin implements Plugin<Project> {
                     if (sub.type.get() != RegistrationUtilsExtension.SubProject.Type.COMMON) {
                         final Configuration runtimeClasspathConfig = proj.getConfigurations().findByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME);
                         if (runtimeClasspathConfig != null) {
-                            runtimeClasspathConfig.extendsFrom(regUtilsConfig);
+                            runtimeClasspathConfig.extendsFrom(regUtilsRuntimeConfig);
                         }
                     }
                 }
