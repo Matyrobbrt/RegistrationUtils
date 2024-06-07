@@ -37,9 +37,11 @@ import org.gradle.api.plugins.UnknownPluginException;
 public class RegistrationUtilsPlugin implements Plugin<Project> {
 
     public static final String VERSION;
+    public static final String JPMS_VERSION;
     static {
         final String ver = RegistrationUtilsPlugin.class.getPackage().getImplementationVersion();
         VERSION = ver == null ? "dev" : ver;
+        JPMS_VERSION = Character.isDigit(VERSION.charAt(0)) ? VERSION : ("0.0" + VERSION);
     }
 
     public static final String CONFIGURATION_NAME = "registrationUtils";
