@@ -7,13 +7,14 @@ import java.time.format.DateTimeFormatter
 buildscript {
 	dependencies {
 		classpath 'org.codehaus.groovy:groovy-all:3.0.9'
+		classpath 'org.ow2.asm:asm:9.7'
 	}
 }
 
 plugins {
 	id 'java-gradle-plugin'
 	id 'maven-publish'
-	id 'com.gradle.plugin-publish' version '0.18.0'
+	id 'com.gradle.plugin-publish' version '1.2.1'
 	id 'idea'
 	id 'com.github.johnrengelman.shadow' version '8.1.1'
 	id 'org.cadixdev.licenser' version '0.6.1' apply false
@@ -21,9 +22,11 @@ plugins {
 	id "org.jetbrains.gradle.plugin.idea-ext" version "1.1.8"
 }
 
+println(System.getProperty('java.home'))
+
 subprojects {
 	apply plugin: 'java'
-	java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+	java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 }
 
 group = 'com.matyrobbrt.mc.registrationutils'
@@ -45,8 +48,8 @@ repositories {
 }
 
 dependencies {
-	shade 'org.ow2.asm:asm:9.5'
-	shade 'org.ow2.asm:asm-tree:9.5'
+	shade 'org.ow2.asm:asm:9.7'
+	shade 'org.ow2.asm:asm-tree:9.7'
 	shade 'me.lucko:jar-relocator:1.5'
 	shade 'commons-io:commons-io:2.13.0'
 
@@ -110,12 +113,6 @@ class ExtraConfiguration {
 	}
 }
 
-pluginBundle {
-	website = 'https://github.com/Matyrobbrt/RegistrationUtils'
-	vcsUrl = 'https://github.com/Matyrobbrt/RegistrationUtils'
-	tags = ['minecraft', 'forge', 'neoforge', 'fabric', 'quilt', 'multiloader']
-}
-
 components.java.withVariantsFromConfiguration(configurations.runtimeElements) {
     skip()
 }
@@ -124,12 +121,15 @@ components.java.withVariantsFromConfiguration(configurations.apiElements) {
 }
 
 gradlePlugin {
+	website = 'https://github.com/Matyrobbrt/RegistrationUtils'
+	vcsUrl = 'https://github.com/Matyrobbrt/RegistrationUtils'
 	plugins {
 		registrationUtils {
 			id = 'com.matyrobbrt.mc.registrationutils'
 			displayName = 'RegistrationUtils'
 			description = 'A Minecraft modding plugin providing a library for easy multiloader registration.'
 			implementationClass = 'com.matyrobbrt.registrationutils.gradle.RegistrationUtilsPlugin'
+			tags = ['minecraft', 'forge', 'neoforge', 'fabric', 'quilt', 'multiloader']
 		}
 	}
 }

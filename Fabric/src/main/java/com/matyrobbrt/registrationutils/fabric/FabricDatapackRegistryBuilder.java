@@ -29,7 +29,6 @@
 package com.matyrobbrt.registrationutils.fabric;
 
 import com.google.auto.service.AutoService;
-import com.google.common.collect.ImmutableMap;
 import com.matyrobbrt.registrationutils.registries.DatapackRegistry;
 import com.matyrobbrt.registrationutils.registries.DatapackRegistryBuilder;
 import com.matyrobbrt.registrationutils.util.DatapackRegistryGenerator;
@@ -49,15 +48,11 @@ import org.jetbrains.annotations.Nullable;
 import sun.misc.Unsafe;
 
 import javax.annotation.ParametersAreNonnullByDefault;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -66,13 +61,13 @@ import java.util.stream.Stream;
 @ParametersAreNonnullByDefault
 public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder<T> {
     private static final Unsafe UNSAFE;
-    private static final MethodHandles.Lookup IMPL_LOOKUP;
 
     private static final Field WORLDGEN_REGISTRIES;
+    private static final Field SYNCHRONIZED_REGISTRIES;
     private static final Field NETWORKABLE_REGISTRIES;
     private static final long offset$WORLDGEN_REGISTRIES;
+    private static final long offset$SYNCHRONIZED_REGISTRIES;
     private static final long offset$NETWORKABLE_REGISTRIES;
-    private static final MethodHandle new$NetworkedRegistryData;
 
     public static final Set<ResourceLocation> OWNED_REGISTRIES = new HashSet<>();
 
@@ -82,8 +77,6 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
             field.setAccessible(true);
             UNSAFE = (Unsafe) field.get(null);
 
-            IMPL_LOOKUP = (MethodHandles.Lookup) UNSAFE.getObject(MethodHandles.Lookup.class, UNSAFE.staticFieldOffset(MethodHandles.Lookup.class.getDeclaredField("IMPL_LOOKUP")));
-
             WORLDGEN_REGISTRIES = Stream.of(RegistryDataLoader.class.getDeclaredFields())
                     .filter(fld -> Modifier.isStatic(fld.getModifiers()) && fld.getType() == List.class)
                     .filter(fld -> getStaticOrNull(fld) == RegistryDataLoader.WORLDGEN_REGISTRIES)
@@ -91,13 +84,16 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
 
             offset$WORLDGEN_REGISTRIES = UNSAFE.staticFieldOffset(WORLDGEN_REGISTRIES);
 
-            NETWORKABLE_REGISTRIES = Stream.of(RegistrySynchronization.class.getDeclaredFields())
-                    .filter(it -> it.getType() == Map.class).findFirst().orElseThrow();
-            offset$NETWORKABLE_REGISTRIES = UNSAFE.staticFieldOffset(NETWORKABLE_REGISTRIES);
+            SYNCHRONIZED_REGISTRIES = Stream.of(RegistryDataLoader.class.getDeclaredFields())
+                    .filter(fld -> Modifier.isStatic(fld.getModifiers()) && fld.getType() == List.class)
+                    .filter(fld -> getStaticOrNull(fld) == RegistryDataLoader.SYNCHRONIZED_REGISTRIES)
+                    .findFirst().orElseThrow();
 
-            final Class<?> networkedRegistryData = Stream.of(RegistrySynchronization.class.getDeclaredClasses())
-                    .filter(Class::isRecord).findFirst().orElseThrow();
-            new$NetworkedRegistryData = IMPL_LOOKUP.findConstructor(networkedRegistryData, MethodType.methodType(void.class, ResourceKey.class, Codec.class));
+            offset$SYNCHRONIZED_REGISTRIES = UNSAFE.staticFieldOffset(SYNCHRONIZED_REGISTRIES);
+
+            NETWORKABLE_REGISTRIES = Stream.of(RegistrySynchronization.class.getDeclaredFields())
+                    .filter(it -> it.getType() == Set.class).findFirst().orElseThrow();
+            offset$NETWORKABLE_REGISTRIES = UNSAFE.staticFieldOffset(NETWORKABLE_REGISTRIES);
         } catch (Exception ex) {
             throw new RuntimeException("Barf!", ex);
         }
@@ -131,7 +127,6 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public DatapackRegistry<T> build() {
         Objects.requireNonNull(elementCodec, "element codec must not be null");
 
@@ -148,18 +143,15 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
                 UNSAFE.putObject(RegistryDataLoader.class, offset$WORLDGEN_REGISTRIES, List.copyOf(mutableCopy));
 
                 if (networkCodec != null) {
-                    final Object data = new$NetworkedRegistryData.invoke(key, networkCodec);
+                    final List<RegistryDataLoader.RegistryData<?>> mutableNetwork = new ArrayList<>(RegistryDataLoader.SYNCHRONIZED_REGISTRIES);
+                    mutableNetwork.add(new RegistryDataLoader.RegistryData<>(
+                            key, networkCodec
+                    ));
+                    UNSAFE.putObject(RegistryDataLoader.class, offset$SYNCHRONIZED_REGISTRIES, List.copyOf(mutableNetwork));
 
-                    Map<ResourceKey<? extends Registry<?>>, Object> registries = (Map<ResourceKey<? extends Registry<?>>, Object>) UNSAFE.getObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES);
-                    if (registries == null) {
-                        UNSAFE.allocateInstance(RegistrySynchronization.class); // Allocate a new instance of RegistrySynchronization in order to make sure the field is initialised
-                        registries = (Map<ResourceKey<? extends Registry<?>>, Object>) UNSAFE.getObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES);
-                    }
-
-                    final ImmutableMap.Builder<ResourceKey<? extends Registry<?>>, Object> builder = ImmutableMap.builder();
-                    builder.putAll(registries);
-                    builder.put(key, data);
-                    UNSAFE.putObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES, builder.build());
+                    final Set<ResourceKey<? extends Registry<?>>> networkable = new HashSet<>(RegistrySynchronization.NETWORKABLE_REGISTRIES);
+                    networkable.add(key);
+                    UNSAFE.putObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES, Set.copyOf(networkable));
                 }
             } catch (Throwable throwable) {
                 throw new RuntimeException("Could not register datapack registry: ", throwable);
