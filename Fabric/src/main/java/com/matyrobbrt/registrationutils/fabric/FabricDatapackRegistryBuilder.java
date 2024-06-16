@@ -138,14 +138,14 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
             try {
                 final List<RegistryDataLoader.RegistryData<?>> mutableCopy = new ArrayList<>(RegistryDataLoader.WORLDGEN_REGISTRIES);
                 mutableCopy.add(new RegistryDataLoader.RegistryData<>(
-                        key, elementCodec
+                        key, elementCodec, false
                 ));
                 UNSAFE.putObject(RegistryDataLoader.class, offset$WORLDGEN_REGISTRIES, List.copyOf(mutableCopy));
 
                 if (networkCodec != null) {
                     final List<RegistryDataLoader.RegistryData<?>> mutableNetwork = new ArrayList<>(RegistryDataLoader.SYNCHRONIZED_REGISTRIES);
                     mutableNetwork.add(new RegistryDataLoader.RegistryData<>(
-                            key, networkCodec
+                            key, networkCodec, false
                     ));
                     UNSAFE.putObject(RegistryDataLoader.class, offset$SYNCHRONIZED_REGISTRIES, List.copyOf(mutableNetwork));
 

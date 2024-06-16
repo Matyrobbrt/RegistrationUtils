@@ -50,7 +50,7 @@ public class FabricArgumentTypeHelper implements ArgumentTypeHelper {
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public <A extends ArgumentType<?>, T extends ArgumentTypeInfo.Template<A>, I extends ArgumentTypeInfo<A, T>> RegistryObject<ArgumentTypeInfo<?, ?>, I> register(RegistrationProvider<ArgumentTypeInfo<?, ?>> provider, String name, Class<A> clazz, Supplier<I> serializer) {
-        final ResourceLocation loc = new ResourceLocation(provider.getModId(), name);
+        final ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(provider.getModId(), name);
         final I ser = serializer.get();
         ArgumentTypeRegistry.registerArgumentType(loc, clazz, ser);
 

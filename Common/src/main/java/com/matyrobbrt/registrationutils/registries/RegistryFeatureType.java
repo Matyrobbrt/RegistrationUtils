@@ -49,7 +49,7 @@ public final class RegistryFeatureType<X> {
     /**
      * When a registry has this feature, its IDs will be synced between servers and clients. Works on both loaders.
      */
-    public static final RegistryFeatureType<Void> SYNCED = getNoArgs(new ResourceLocation("synced"));
+    public static final RegistryFeatureType<Void> SYNCED = getNoArgs(ResourceLocation.withDefaultNamespace("synced"));
 
     /**
      * When a registry has this feature, it will be a {@link net.minecraft.core.DefaultedRegistry}. Works on both loaders. <br>
@@ -57,7 +57,7 @@ public final class RegistryFeatureType<X> {
      *
      * @see RegistryBuilder#withDefaultValue(String, Supplier)
      */
-    public static final RegistryFeatureType<ResourceLocation> DEFAULTED = get(new ResourceLocation("defaulted"), ResourceLocation.class);
+    public static final RegistryFeatureType<ResourceLocation> DEFAULTED = get(ResourceLocation.withDefaultNamespace("defaulted"), ResourceLocation.class);
 
     private final ResourceLocation id;
     private final Class<X> argumentType;

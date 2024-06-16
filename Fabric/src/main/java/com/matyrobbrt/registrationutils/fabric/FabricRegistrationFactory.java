@@ -91,7 +91,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
         @Override
         public <I extends Item> ItemRegistryObject<I> register(String name, Supplier<? extends I> supplier) {
-            final var rl = new ResourceLocation(modId, name);
+            final var rl = ResourceLocation.fromNamespaceAndPath(modId, name);
             return create(rl, Registry.register(registry.get(), rl, supplier.get()));
         }
 
@@ -119,7 +119,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
         @Override
         public <B extends Block> BlockRegistryObject<B> register(String name, Supplier<? extends B> supplier) {
-            final var rl = new ResourceLocation(modId, name);
+            final var rl = ResourceLocation.fromNamespaceAndPath(modId, name);
             return create(rl, Registry.register(registry.get(), rl, supplier.get()));
         }
 
@@ -178,7 +178,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
         @Override
         public <I extends T> RegistryObject<T, I> register(String name, Supplier<? extends I> supplier) {
-            final var rl = new ResourceLocation(modId, name);
+            final var rl = ResourceLocation.fromNamespaceAndPath(modId, name);
             return create(rl, Registry.register(registry.get(), rl, supplier.get()));
         }
 
@@ -255,7 +255,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
             @Override
             public RegistryBuilder<T> withDefaultValue(String id, Supplier<T> defaultValueSupplier) {
                 this.defaultValueSupplier = defaultValueSupplier;
-                return this.withFeature(RegistryFeatureType.DEFAULTED, new ResourceLocation(modId, id));
+                return this.withFeature(RegistryFeatureType.DEFAULTED, ResourceLocation.fromNamespaceAndPath(modId, id));
             }
 
             @Override

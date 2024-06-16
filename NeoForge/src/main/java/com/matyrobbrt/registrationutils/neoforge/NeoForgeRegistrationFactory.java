@@ -247,7 +247,7 @@ public class NeoForgeRegistrationFactory implements RegistrationProvider.Factory
             @Override
             public RegistryBuilder<T> withDefaultValue(String id, Supplier<T> defaultValueSupplier) {
                 register(id, defaultValueSupplier);
-                return withFeature(RegistryFeatureType.DEFAULTED, new ResourceLocation(modId, id));
+                return withFeature(RegistryFeatureType.DEFAULTED, ResourceLocation.fromNamespaceAndPath(modId, id));
             }
 
             @Override

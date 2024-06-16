@@ -29,19 +29,21 @@
 package com.matyrobbrt.registrationutils.fabric.mixin;
 
 import com.matyrobbrt.registrationutils.fabric.FabricDatapackRegistryBuilder;
-import net.minecraft.resources.RegistryDataLoader;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(RegistryDataLoader.class)
-public class RegistryDataLoaderMixin {
-    @Inject(at = @At("HEAD"), method = "registryDirPath", cancellable = true)
-    private static void regutils$customRegistry(ResourceLocation resourceLocation, CallbackInfoReturnable<String> cir) {
+@Mixin(Registries.class)
+public class RegistriesMixin {
+    @Inject(at = @At("HEAD"), method = "tagsDirPath", cancellable = true)
+    private static void regutils$customRegistry(ResourceKey<? extends Registry<?>> resourceKey, CallbackInfoReturnable<String> cir) {
+        var resourceLocation = resourceKey.location();
         if (FabricDatapackRegistryBuilder.OWNED_REGISTRIES.contains(resourceLocation)) {
-            cir.setReturnValue(resourceLocation.getNamespace() + "/" + resourceLocation.getPath());
+            cir.setReturnValue("tags/" + resourceLocation.getNamespace() + "/" + resourceLocation.getPath());
         }
     }
 }

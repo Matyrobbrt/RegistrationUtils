@@ -3,7 +3,7 @@
   "package": "com.matyrobbrt.registrationutils.fabric.mixin",
   "compatibilityLevel": "JAVA_17",
   "mixins": [
-    "RegistryDataLoaderMixin"
+    "RegistriesMixin"
   ],
   "injectors": {
     "defaultRequire": 1
