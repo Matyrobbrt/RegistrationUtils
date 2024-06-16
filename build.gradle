@@ -22,11 +22,16 @@ plugins {
 	id "org.jetbrains.gradle.plugin.idea-ext" version "1.1.8"
 }
 
-println(System.getProperty('java.home'))
-
 subprojects {
 	apply plugin: 'java'
 	java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+if (System.getenv('GPP_KEY')) {
+	project.ext {
+		set('gradle.publish.key', System.getenv('GPP_KEY'))
+		set('gradle.publish.secret', System.getenv('GPP_SECRET'))
+	}
 }
 
 group = 'com.matyrobbrt.mc.registrationutils'
@@ -42,7 +47,7 @@ configurations {
 }
 
 repositories {
-	maven { name = 'Forge'; url = 'https://maven.neoforged.net/' }
+	maven { name = 'NeoForge'; url = 'https://maven.neoforged.net/' }
 	maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
 	maven { name = 'Sponge'; url = 'https://repo.spongepowered.org/repository/maven-public/' }
 }
