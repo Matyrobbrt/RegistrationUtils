@@ -71,10 +71,8 @@ public interface RegistryBuilder<T> {
 
     /**
      * Builds and registers this registry. <br>
-     * <strong>Calling {@link Supplier#get() get} too early might result in exceptions.</strong>
-     * Prefer using registry keys for referencing the registry.
      *
      * @return a supplier of the registry
      */
-    Supplier<Registry<T>> build();
+    Registry<T> build();
 }

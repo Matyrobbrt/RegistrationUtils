@@ -259,18 +259,18 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
             }
 
             @Override
-            public Supplier<Registry<T>> build() {
+            public Registry<T> build() {
                 final FabricRegistryBuilder<T, MappedRegistry<T>> builder = FabricRegistryBuilder.from(makeRegistry());
 
                 if (features.containsKey(RegistryFeatureType.SYNCED)) {
                     builder.attribute(RegistryAttribute.SYNCED);
                 }
 
-                final Supplier<Registry<T>> sup = Suppliers.ofInstance(builder.buildAndRegister());
+                final var reg = builder.buildAndRegister();
                 if (defaultValueSupplier != null) {
-                    Registry.register(sup.get(), (ResourceLocation) features.get(RegistryFeatureType.DEFAULTED), defaultValueSupplier.get());
+                    Registry.register(reg, (ResourceLocation) features.get(RegistryFeatureType.DEFAULTED), defaultValueSupplier.get());
                 }
-                return sup;
+                return reg;
             }
 
             public MappedRegistry<T> makeRegistry() {

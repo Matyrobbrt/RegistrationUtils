@@ -145,7 +145,7 @@ public class NeoForgeRegistrationFactory implements RegistrationProvider.Factory
     private static class Provider<T> implements RegistrationProvider<T> {
         protected final String modId;
         protected final DeferredRegister<T> registry;
-        private net.neoforged.neoforge.registries.RegistryBuilder<T> regBuilder;
+        private Registry<T> customRegistry;
 
         protected final Set<RegistryObject<T, ? extends T>> entries = new HashSet<>();
         private final Set<RegistryObject<T, ? extends T>> entriesView = Collections.unmodifiableSet(entries);
@@ -156,8 +156,8 @@ public class NeoForgeRegistrationFactory implements RegistrationProvider.Factory
         }
 
         private void onNewRegistry(NewRegistryEvent event) {
-            if (regBuilder != null) {
-                event.create(regBuilder);
+            if (customRegistry != null) {
+                event.register(customRegistry);
             }
         }
 
@@ -251,10 +251,10 @@ public class NeoForgeRegistrationFactory implements RegistrationProvider.Factory
             }
 
             @Override
-            public Supplier<Registry<T>> build() {
+            public Registry<T> build() {
                 configureBuilder();
-                Provider.this.regBuilder = builder;
-                return Provider.this.registryInstance;
+                Provider.this.customRegistry = builder.create();
+                return Provider.this.customRegistry;
             }
 
             private void configureBuilder() {
