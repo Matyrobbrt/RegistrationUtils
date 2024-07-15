@@ -91,7 +91,7 @@ public abstract class GenerateArtifactTask extends GenerateTask {
             relocator.run();
 
             final Pattern groupPattern = Pattern.compile(getInitialGroup().get().replace(".", "\\."));
-            final Pattern groupPatternND = Pattern.compile(getTargetGroup().get().replace('.', '/'));
+            final Pattern groupPatternND = Pattern.compile(getInitialGroup().get().replace('.', '/'));
 
             try (JarOutputStream out = new JarOutputStream(new BufferedOutputStream(new FileOutputStream(getOutputJar().get().getAsFile())))) {
                 // Now we gotta rename META-INFs or (mixin) jsons
