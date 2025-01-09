@@ -277,6 +277,7 @@ public class RegExtension {
                 t.from(project.zipTree(sources.get().getOutputJar()));
                 t.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE);
                 t.dependsOn(classes, sources);
+                configureManifest(t);
             });
             TaskProvider<Jar> finalCombined = combined;
             ideSync.configure(t -> t.dependsOn(finalCombined));
@@ -312,14 +313,13 @@ public class RegExtension {
                 t.from(project.zipTree(common.get().getArchiveFile()));
                 t.from(project.zipTree(loaderSpecific.get().getArchiveFile()));
                 t.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE);
+                configureManifest(t);
             });
             TaskProvider<Jar> finalJoinedJar = joinedJar;
             ideSync.configure(t -> t.dependsOn(finalJoinedJar));
         }
         return joinedJar;
     }
-
-
 
     private TaskProvider<Jar> joinedPartialJarTask(RegistrationUtilsExtension.SubProject.Type type, boolean sources) {
         TaskProvider<Jar> joinedJar;
@@ -336,11 +336,16 @@ public class RegExtension {
                 t.from(project.zipTree(loaderSpecific.get().getOutputJar()));
                 t.setDuplicatesStrategy(DuplicatesStrategy.INCLUDE);
                 t.dependsOn(common, loaderSpecific);
+                configureManifest(t);
             });
             TaskProvider<Jar> finalJoinedJar = joinedJar;
             ideSync.configure(t -> t.dependsOn(finalJoinedJar));
         }
         return joinedJar;
+    }
+
+    private void configureManifest(Jar jar) {
+        jar.manifest(mf -> mf.attributes(Map.of("FMLModType", "GAMELIBRARY", "Implementation-Version", RegistrationUtilsPlugin.JPMS_VERSION)));
     }
 
     private void handleTransformation(Path classesOut) {
