@@ -59,8 +59,7 @@ public class FabricArgumentTypeHelper implements ArgumentTypeHelper {
         }
         return new RegistryObject<>() {
             final ResourceKey<ArgumentTypeInfo<?, ?>> key = ResourceKey.create(Registries.COMMAND_ARGUMENT_TYPE, loc);
-            final Holder<ArgumentTypeInfo<?, ?>> holder =BuiltInRegistries.COMMAND_ARGUMENT_TYPE.getHolder(ResourceKey.create(Registries.COMMAND_ARGUMENT_TYPE, loc))
-                    .orElseThrow();
+            final Holder<ArgumentTypeInfo<?, ?>> holder = BuiltInRegistries.COMMAND_ARGUMENT_TYPE.getOrThrow(ResourceKey.create(Registries.COMMAND_ARGUMENT_TYPE, loc));
 
             @Override
             public ResourceKey<ArgumentTypeInfo<?, ?>> getResourceKey() {

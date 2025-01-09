@@ -100,7 +100,7 @@ public class NeoForgeDatapackRegistryBuilder<T> implements DatapackRegistryBuild
 
             @Override
             public Registry<T> get(RegistryAccess registryAccess) {
-                return registryAccess.registryOrThrow(key);
+                return registryAccess.lookupOrThrow(key);
             }
         };
     }

@@ -149,7 +149,9 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
                     ));
                     UNSAFE.putObject(RegistryDataLoader.class, offset$SYNCHRONIZED_REGISTRIES, List.copyOf(mutableNetwork));
 
-                    final Set<ResourceKey<? extends Registry<?>>> networkable = new HashSet<>(RegistrySynchronization.NETWORKABLE_REGISTRIES);
+                    //noinspection unchecked
+                    var oldNetworkable = (Set<ResourceKey<? extends Registry<?>>>) UNSAFE.getObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES);
+                    final Set<ResourceKey<? extends Registry<?>>> networkable = new HashSet<>(oldNetworkable);
                     networkable.add(key);
                     UNSAFE.putObject(RegistrySynchronization.class, offset$NETWORKABLE_REGISTRIES, Set.copyOf(networkable));
                 }
@@ -176,7 +178,7 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
 
             @Override
             public Registry<T> get(RegistryAccess registryAccess) {
-                return registryAccess.registryOrThrow(key);
+                return registryAccess.lookupOrThrow(key);
             }
         };
     }

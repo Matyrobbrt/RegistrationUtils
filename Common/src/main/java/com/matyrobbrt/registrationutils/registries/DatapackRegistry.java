@@ -104,7 +104,7 @@ public interface DatapackRegistry<T> {
      *
      * @param registryAccess the access to get the registry from
      * @return the registry
-     * @see RegistryAccess#registryOrThrow(ResourceKey)
+     * @see RegistryAccess#lookupOrThrow(ResourceKey)
      * @throws IllegalStateException if the registry does not exist in the access
      */
     Registry<T> get(RegistryAccess registryAccess);

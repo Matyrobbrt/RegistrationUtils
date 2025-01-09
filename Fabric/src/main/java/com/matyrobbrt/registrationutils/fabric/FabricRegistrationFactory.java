@@ -151,11 +151,11 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
             this.modId = modId;
 
             this.registry = Suppliers.memoize(() -> {
-                final var reg = BuiltInRegistries.REGISTRY.get(key.location());
+                final var reg = BuiltInRegistries.REGISTRY.get(key.location()).orElse(null);
                 if (reg == null) {
                     throw new RuntimeException("Registry with name " + key.location() + " was not found!");
                 }
-                return (Registry<T>) reg;
+                return (Registry<T>) reg.value();
             });
             this.registryKey = key;
         }
@@ -183,7 +183,6 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         public <I extends T> RegistryObject<T, I> create(ResourceLocation rl, I obj) {
             final var ro = new RO<>(obj, rl);
             entries.add(ro);
@@ -218,7 +217,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
             @Override
             public Holder<T> asHolder() {
-                return registry.get().getHolderOrThrow(this.key);
+                return registry.get().getOrThrow(this.key);
             }
         };
 

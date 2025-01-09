@@ -180,7 +180,7 @@ public class NeoForgeRegistrationFactory implements RegistrationProvider.Factory
 
         @SuppressWarnings("unchecked")
         private static <T> T get(Registry<T> registry, ResourceKey<?> key) {
-            return registry.get((ResourceKey<T>) key);
+            return registry.getValueOrThrow((ResourceKey<T>) key);
         }
 
         @Override
