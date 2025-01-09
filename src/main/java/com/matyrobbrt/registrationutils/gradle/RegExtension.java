@@ -71,6 +71,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 public class RegExtension {
 
@@ -345,7 +346,10 @@ public class RegExtension {
     }
 
     private void configureManifest(Jar jar) {
-        jar.manifest(mf -> mf.attributes(Map.of("FMLModType", "GAMELIBRARY", "Implementation-Version", RegistrationUtilsPlugin.JPMS_VERSION)));
+        Map<String, String> map = new HashMap<>();
+        map.put("FMLModType", "GAMELIBRARY");
+        map.put("Implementation-Version", RegistrationUtilsPlugin.JPMS_VERSION);
+        jar.manifest(mf -> mf.attributes(map));
     }
 
     private void handleTransformation(Path classesOut) {
