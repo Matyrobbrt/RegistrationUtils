@@ -1,0 +1,38 @@
+name: Publish to GPP
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1000
+          fetch-tags: true
+
+      - name: Make Gradle executable
+        # language=bash
+        run: chmod +x ./gradlew # Thanks Windows
+
+      - name: Setup Java 17
+        # https://github.com/actions/runner-images/blob/main/images/linux/Ubuntu2204-Readme.md#java
+        # language=bash
+        run: |
+          echo "JAVA_HOME=$(echo $JAVA_HOME_17_X64)" >> "$GITHUB_ENV"
+
+      - name: Validate wrapper
+        uses: gradle/actions/wrapper-validation@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build project
+        run: ./gradlew build
+
+      - name: Gradle publish
+        run: ./gradlew publishPlugins
+        env:
+          GPP_KEY: ${{ secrets.GPP_KEY }}
+          GPP_SECRET: ${{ secrets.GPP_SECRET }}
