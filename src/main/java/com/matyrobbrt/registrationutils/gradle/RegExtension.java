@@ -77,7 +77,7 @@ public class RegExtension {
     public static final String JAR_NAME = "regutils";
     public static final JsonSlurper PARSER = new JsonSlurper();
     public static final JsonGenerator GENERATOR = new JsonGenerator.Options().build();
-    public static final String MIXINS_JSON = "regutils.mixins.json";
+    public static final String MIXINS_JSON = null;
     private static final String AFTER_SYNC_TASK = "regutilsIdeSync";
 
     private final Project project;
@@ -170,6 +170,7 @@ public class RegExtension {
                 tsk.doLast(new Action<>() {
                     @Override
                     public void execute(Task task) {
+                        if (MIXINS_JSON == null) return;
                         try (final FileSystem fs = FileSystems.newFileSystem(jar.getArchiveFile().get().getAsFile().toPath(), (ClassLoader) null)) {
                             final Path fmj = fs.getPath("fabric.mod.json");
                             if (Files.exists(fmj)) {
