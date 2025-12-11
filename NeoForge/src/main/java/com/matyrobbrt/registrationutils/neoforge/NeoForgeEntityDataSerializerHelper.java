@@ -32,7 +32,7 @@ import com.google.auto.service.AutoService;
 import com.matyrobbrt.registrationutils.EntityDataSerializerHelper;
 import com.matyrobbrt.registrationutils.RegistrationProvider;
 import net.minecraft.network.syncher.EntityDataSerializer;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import org.jetbrains.annotations.ApiStatus;
 
@@ -47,7 +47,7 @@ public class NeoForgeEntityDataSerializerHelper implements EntityDataSerializerH
     private final Map<String, RegistrationProvider<EntityDataSerializer<?>>> byModId = new ConcurrentHashMap<>();
 
     @Override
-    public <T> EntityDataSerializer<T> register(ResourceLocation key, EntityDataSerializer<T> serializer) {
+    public <T> EntityDataSerializer<T> register(Identifier key, EntityDataSerializer<T> serializer) {
         getProvider(key.getNamespace()).register(key.getPath(), () -> serializer);
         return serializer;
     }

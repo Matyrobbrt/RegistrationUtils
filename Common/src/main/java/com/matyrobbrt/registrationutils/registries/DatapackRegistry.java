@@ -28,15 +28,15 @@
 
 package com.matyrobbrt.registrationutils.registries;
 
-import net.minecraft.Util;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.RegistrySetBuilder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.data.DataProvider;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Util;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -66,7 +66,7 @@ public interface DatapackRegistry<T> {
      * @param <T> the type of the registry
      * @return a builder
      */
-    static <T> DatapackRegistryBuilder<T> builder(ResourceLocation key) {
+    static <T> DatapackRegistryBuilder<T> builder(Identifier key) {
         return builder(ResourceKey.createRegistryKey(key));
     }
 
