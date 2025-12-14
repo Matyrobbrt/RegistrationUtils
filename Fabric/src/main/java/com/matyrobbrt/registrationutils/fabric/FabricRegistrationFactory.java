@@ -46,18 +46,13 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import org.jetbrains.annotations.ApiStatus;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Supplier;
 
 @AutoService(RegistrationProvider.Factory.class)
@@ -91,13 +86,13 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
         @Override
         public <I extends Item> ItemRegistryObject<I> register(String name, Supplier<? extends I> supplier) {
-            final var rl = ResourceLocation.fromNamespaceAndPath(modId, name);
+            final var rl = Identifier.fromNamespaceAndPath(modId, name);
             return create(rl, Registry.register(registry.get(), rl, supplier.get()));
         }
 
         @Override
         @SuppressWarnings("unchecked")
-        public <I extends Item> ItemRegistryObject<I> create(ResourceLocation rl, I obj) {
+        public <I extends Item> ItemRegistryObject<I> create(Identifier rl, I obj) {
             final var ro = new ItemRO<>(obj, rl);
             entries.add(ro);
             return ro;
@@ -105,7 +100,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
         private class ItemRO<I extends Item> extends RO<I> implements ItemRegistryObject<I> {
 
-            protected ItemRO(I obj, ResourceLocation rl) {
+            protected ItemRO(I obj, Identifier rl) {
                 super(obj, rl);
             }
         }
@@ -119,12 +114,12 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
         @Override
         public <B extends Block> BlockRegistryObject<B> register(String name, Supplier<? extends B> supplier) {
-            final var rl = ResourceLocation.fromNamespaceAndPath(modId, name);
+            final var rl = Identifier.fromNamespaceAndPath(modId, name);
             return create(rl, Registry.register(registry.get(), rl, supplier.get()));
         }
 
         @Override
-        public <B extends Block> BlockRegistryObject<B> create(ResourceLocation rl, B obj) {
+        public <B extends Block> BlockRegistryObject<B> create(Identifier rl, B obj) {
             final var ro = new BlockRO<>(obj, rl);
             entries.add(ro);
             return ro;
@@ -132,7 +127,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
         private class BlockRO<B extends Block> extends RO<B> implements BlockRegistryObject<B> {
 
-            protected BlockRO(B obj, ResourceLocation rl) {
+            protected BlockRO(B obj, Identifier rl) {
                 super(obj, rl);
             }
         }
@@ -151,9 +146,9 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
             this.modId = modId;
 
             this.registry = Suppliers.memoize(() -> {
-                final var reg = BuiltInRegistries.REGISTRY.get(key.location()).orElse(null);
+                final var reg = BuiltInRegistries.REGISTRY.get(key.identifier()).orElse(null);
                 if (reg == null) {
-                    throw new RuntimeException("Registry with name " + key.location() + " was not found!");
+                    throw new RuntimeException("Registry with name " + key.identifier() + " was not found!");
                 }
                 return (Registry<T>) reg.value();
             });
@@ -178,12 +173,12 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
         @Override
         public <I extends T> RegistryObject<T, I> register(String name, Supplier<? extends I> supplier) {
-            final var rl = ResourceLocation.fromNamespaceAndPath(modId, name);
+            final var rl = Identifier.fromNamespaceAndPath(modId, name);
             return create(rl, Registry.register(registry.get(), rl, supplier.get()));
         }
 
         @Override
-        public <I extends T> RegistryObject<T, I> create(ResourceLocation rl, I obj) {
+        public <I extends T> RegistryObject<T, I> create(Identifier rl, I obj) {
             final var ro = new RO<>(obj, rl);
             entries.add(ro);
             return ro;
@@ -191,10 +186,10 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
         protected class RO<I extends T> implements RegistryObject<T, I> {
             private final I obj;
-            private final ResourceLocation rl;
+            private final Identifier rl;
             final ResourceKey<T> key;
 
-            protected RO(I obj, ResourceLocation rl) {
+            protected RO(I obj, Identifier rl) {
                 this.obj = obj;
                 this.rl = rl;
                 this.key = ResourceKey.create(getRegistryKey(), rl);
@@ -206,7 +201,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
             }
 
             @Override
-            public ResourceLocation getId() {
+            public Identifier getId() {
                 return rl;
             }
 
@@ -254,7 +249,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
             @Override
             public RegistryBuilder<T> withDefaultValue(String id, Supplier<T> defaultValueSupplier) {
                 this.defaultValueSupplier = defaultValueSupplier;
-                return this.withFeature(RegistryFeatureType.DEFAULTED, ResourceLocation.fromNamespaceAndPath(modId, id));
+                return this.withFeature(RegistryFeatureType.DEFAULTED, Identifier.fromNamespaceAndPath(modId, id));
             }
 
             @Override
@@ -267,7 +262,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
                 final var reg = builder.buildAndRegister();
                 if (defaultValueSupplier != null) {
-                    Registry.register(reg, (ResourceLocation) features.get(RegistryFeatureType.DEFAULTED), defaultValueSupplier.get());
+                    Registry.register(reg, (Identifier) features.get(RegistryFeatureType.DEFAULTED), defaultValueSupplier.get());
                 }
                 return reg;
             }
@@ -275,7 +270,7 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
             public MappedRegistry<T> makeRegistry() {
                 if (features.containsKey(RegistryFeatureType.DEFAULTED)) {
                     return new DefaultedMappedRegistry<>(
-                            ((ResourceLocation) features.get(RegistryFeatureType.DEFAULTED)).toString(),
+                            ((Identifier) features.get(RegistryFeatureType.DEFAULTED)).toString(),
                             registryKey,
                             Lifecycle.stable(),
                             false
@@ -290,6 +285,6 @@ public class FabricRegistrationFactory implements RegistrationProvider.Factory {
 
     @ApiStatus.Internal
     interface InternalFabricHelper<T> {
-        <I extends T> RegistryObject<T, I> create(ResourceLocation name, I object);
+        <I extends T> RegistryObject<T, I> create(Identifier name, I object);
     }
 }

@@ -31,7 +31,7 @@ package com.matyrobbrt.registrationutils;
 import com.matyrobbrt.registrationutils.util.$InternalRegUtils;
 import net.minecraft.network.syncher.EntityDataSerializer;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -40,7 +40,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
  * <p>
  * Example usage:
  * <pre>{@code
- * public static final EntityDataSerializer<MyType> MY_TYPE_SERIALIZER = EntityDataSerializerHelper.INSTANCE.register(new ResourceLocation("mymod:mytype"), EntityDataSerializer.simple(MyType::write, MyType::read));
+ * public static final EntityDataSerializer<MyType> MY_TYPE_SERIALIZER = EntityDataSerializerHelper.INSTANCE.register(new Identifier("mymod:mytype"), EntityDataSerializer.simple(MyType::write, MyType::read));
  *
  * // The purpose of this method is to be called in the mod's constructor, in order to assure that the class is loaded, and that objects can be registered.
  * public static void loadClass(){}
@@ -63,5 +63,5 @@ public interface EntityDataSerializerHelper {
      * @param <T> the type of the serializer
      * @return the serializer, to be used in {@link SynchedEntityData#defineId(Class, EntityDataSerializer)}
      */
-    <T> EntityDataSerializer<T> register(ResourceLocation key, EntityDataSerializer<T> serializer);
+    <T> EntityDataSerializer<T> register(Identifier key, EntityDataSerializer<T> serializer);
 }

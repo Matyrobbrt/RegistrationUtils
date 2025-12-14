@@ -30,10 +30,10 @@ package com.matyrobbrt.registrationutils.util;
 
 import com.google.gson.JsonElement;
 import com.mojang.logging.LogUtils;
+import com.mojang.logging.annotations.MethodsReturnNonnullByDefault;
 import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.Encoder;
 import com.mojang.serialization.JsonOps;
-import net.minecraft.MethodsReturnNonnullByDefault;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.data.CachedOutput;
@@ -81,8 +81,8 @@ public class DatapackRegistryGenerator implements DataProvider {
     private <T> Optional<CompletableFuture<?>> dumpRegistryCap(CachedOutput output, HolderLookup.Provider lookup, DynamicOps<JsonElement> ops, RegistryDataLoader.RegistryData<T> data) {
         final ResourceKey<? extends Registry<T>> registryKey = data.key();
         return lookup.lookup(registryKey).map((registry) -> {
-            final PackOutput.PathProvider pathProvider = this.output.createPathProvider(PackOutput.Target.DATA_PACK, registryKey.location().getPath());
-            return CompletableFuture.allOf(registry.listElements().map((value) -> dumpValue(pathProvider.json(value.key().location()), output, ops, data.elementCodec(), value.value()))
+            final PackOutput.PathProvider pathProvider = this.output.createPathProvider(PackOutput.Target.DATA_PACK, registryKey.identifier().getPath());
+            return CompletableFuture.allOf(registry.listElements().map((value) -> dumpValue(pathProvider.json(value.key().identifier()), output, ops, data.elementCodec(), value.value()))
                     .toArray(CompletableFuture[]::new));
         });
     }

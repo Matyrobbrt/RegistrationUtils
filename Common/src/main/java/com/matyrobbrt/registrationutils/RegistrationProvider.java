@@ -32,8 +32,8 @@ import com.matyrobbrt.registrationutils.registries.RegistryBuilder;
 import com.matyrobbrt.registrationutils.specialised.SpecialisedRegistrationFactory;
 import com.matyrobbrt.registrationutils.util.$InternalRegUtils;
 import net.minecraft.core.Registry;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 
 import java.util.Collection;
 import java.util.function.Supplier;
@@ -78,7 +78,7 @@ public interface RegistrationProvider<T> {
      * @param <T>        the type of the provider
      * @return the provider
      */
-    static <T> RegistrationProvider<T> get(ResourceLocation registryId, String modId) {
+    static <T> RegistrationProvider<T> get(Identifier registryId, String modId) {
         return Factory.INSTANCE.create(ResourceKey.createRegistryKey(registryId), modId);
     }
 

@@ -32,7 +32,7 @@ import com.google.auto.service.AutoService;
 import com.matyrobbrt.registrationutils.EntityDataSerializerHelper;
 import net.minecraft.network.syncher.EntityDataSerializer;
 import net.minecraft.network.syncher.EntityDataSerializers;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.ApiStatus;
 
 import javax.annotation.ParametersAreNonnullByDefault;
@@ -42,7 +42,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
 @AutoService(EntityDataSerializerHelper.class)
 public class FabricEntityDataSerializerHelper implements EntityDataSerializerHelper {
     @Override
-    public <T> EntityDataSerializer<T> register(ResourceLocation key, EntityDataSerializer<T> serializer) {
+    public <T> EntityDataSerializer<T> register(Identifier key, EntityDataSerializer<T> serializer) {
         EntityDataSerializers.registerSerializer(serializer);
         return serializer;
     }

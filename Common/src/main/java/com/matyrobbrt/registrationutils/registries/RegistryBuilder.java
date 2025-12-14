@@ -30,7 +30,7 @@ package com.matyrobbrt.registrationutils.registries;
 
 import com.matyrobbrt.registrationutils.RegistrationProvider;
 import net.minecraft.core.Registry;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.function.Supplier;
 
@@ -61,9 +61,9 @@ public interface RegistryBuilder<T> {
 
     /**
      * Sets the default value of the registry. <br>
-     * This is equivalent to {@link #withFeature(RegistryFeatureType, Object) withFetaure(RegistryFeatureType.DEFAULTED, new ResourceLocation(modId, id))} and {@link RegistrationProvider#register(String, Supplier)}.
+     * This is equivalent to {@link #withFeature(RegistryFeatureType, Object) withFetaure(RegistryFeatureType.DEFAULTED, new Identifier(modId, id))} and {@link RegistrationProvider#register(String, Supplier)}.
      *
-     * @param id                   the ID of the default value. This is just the {@linkplain ResourceLocation#getNamespace() namespace}
+     * @param id                   the ID of the default value. This is just the {@linkplain Identifier#getNamespace() namespace}
      * @param defaultValueSupplier a supplier of the default value
      * @return the builder instance
      */

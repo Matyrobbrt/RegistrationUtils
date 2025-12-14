@@ -30,20 +30,11 @@ package com.matyrobbrt.registrationutils.gradle.task;
 
 import com.matyrobbrt.registrationutils.gradle.RegistrationUtilsPlugin;
 import org.apache.commons.io.IOUtils;
-import org.gradle.api.DefaultTask;
 import org.gradle.api.file.FileSystemOperations;
-import org.gradle.api.file.RegularFileProperty;
-import org.gradle.api.provider.Property;
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.TaskAction;
 
 import javax.inject.Inject;
-import java.io.BufferedOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.jar.JarEntry;

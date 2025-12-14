@@ -34,15 +34,11 @@ import com.matyrobbrt.registrationutils.registries.DatapackRegistryBuilder;
 import com.matyrobbrt.registrationutils.util.DatapackRegistryGenerator;
 import com.mojang.serialization.Codec;
 import net.fabricmc.fabric.api.event.registry.DynamicRegistries;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.RegistrySetBuilder;
-import net.minecraft.core.RegistrySynchronization;
+import net.minecraft.core.*;
 import net.minecraft.data.DataProvider;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.RegistryDataLoader;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import sun.misc.Unsafe;
@@ -50,11 +46,7 @@ import sun.misc.Unsafe;
 import javax.annotation.ParametersAreNonnullByDefault;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 
@@ -69,7 +61,7 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
     private static final long offset$SYNCHRONIZED_REGISTRIES;
     private static final long offset$NETWORKABLE_REGISTRIES;
 
-    public static final Set<ResourceLocation> OWNED_REGISTRIES = new HashSet<>();
+    public static final Set<Identifier> OWNED_REGISTRIES = new HashSet<>();
 
     static {
         try {
@@ -130,7 +122,7 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
     public DatapackRegistry<T> build() {
         Objects.requireNonNull(elementCodec, "element codec must not be null");
 
-        OWNED_REGISTRIES.add(key.location());
+        OWNED_REGISTRIES.add(key.identifier());
 
         try {
             registerWithFAPI();

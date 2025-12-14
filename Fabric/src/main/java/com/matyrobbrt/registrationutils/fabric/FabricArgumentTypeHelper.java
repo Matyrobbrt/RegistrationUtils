@@ -38,8 +38,8 @@ import net.minecraft.commands.synchronization.ArgumentTypeInfo;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.ApiStatus;
 
 import java.util.function.Supplier;
@@ -50,7 +50,7 @@ public class FabricArgumentTypeHelper implements ArgumentTypeHelper {
     @Override
     @SuppressWarnings({"unchecked", "rawtypes"})
     public <A extends ArgumentType<?>, T extends ArgumentTypeInfo.Template<A>, I extends ArgumentTypeInfo<A, T>> RegistryObject<ArgumentTypeInfo<?, ?>, I> register(RegistrationProvider<ArgumentTypeInfo<?, ?>> provider, String name, Class<A> clazz, Supplier<I> serializer) {
-        final ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(provider.getModId(), name);
+        final Identifier loc = Identifier.fromNamespaceAndPath(provider.getModId(), name);
         final I ser = serializer.get();
         ArgumentTypeRegistry.registerArgumentType(loc, clazz, ser);
 
@@ -67,7 +67,7 @@ public class FabricArgumentTypeHelper implements ArgumentTypeHelper {
             }
 
             @Override
-            public ResourceLocation getId() {
+            public Identifier getId() {
                 return loc;
             }
 

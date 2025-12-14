@@ -41,8 +41,8 @@ import com.matyrobbrt.registrationutils.specialised.ItemRegistryObject;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.neoforged.bus.api.IEventBus;
@@ -53,11 +53,7 @@ import net.neoforged.neoforge.registries.NewRegistryEvent;
 import org.jetbrains.annotations.ApiStatus;
 
 import javax.annotation.Nonnull;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Supplier;
 
 @AutoService(RegistrationProvider.Factory.class)
@@ -204,7 +200,7 @@ public class NeoForgeRegistrationFactory implements RegistrationProvider.Factory
             }
 
             @Override
-            public ResourceLocation getId() {
+            public Identifier getId() {
                 return holder.getId();
             }
 
@@ -247,7 +243,7 @@ public class NeoForgeRegistrationFactory implements RegistrationProvider.Factory
             @Override
             public RegistryBuilder<T> withDefaultValue(String id, Supplier<T> defaultValueSupplier) {
                 register(id, defaultValueSupplier);
-                return withFeature(RegistryFeatureType.DEFAULTED, ResourceLocation.fromNamespaceAndPath(modId, id));
+                return withFeature(RegistryFeatureType.DEFAULTED, Identifier.fromNamespaceAndPath(modId, id));
             }
 
             @Override
@@ -260,7 +256,7 @@ public class NeoForgeRegistrationFactory implements RegistrationProvider.Factory
             private void configureBuilder() {
                 builder.sync(features.containsKey(RegistryFeatureType.SYNCED));
                 if (features.containsKey(RegistryFeatureType.DEFAULTED)) {
-                    builder.defaultKey((ResourceLocation) features.get(RegistryFeatureType.DEFAULTED));
+                    builder.defaultKey((Identifier) features.get(RegistryFeatureType.DEFAULTED));
                 }
             }
         }

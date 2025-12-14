@@ -79,7 +79,7 @@ public class NeoForgeDatapackRegistryBuilder<T> implements DatapackRegistryBuild
 
     @Override
     public DatapackRegistry<T> build() {
-        final IEventBus bus = NeoForgeRegistrationFactory.getBus(key.location().getNamespace());
+        final IEventBus bus = NeoForgeRegistrationFactory.getBus(key.identifier().getNamespace());
         bus.addListener((final DataPackRegistryEvent.NewRegistry event) -> event.dataPackRegistry(key, Objects.requireNonNull(elementCodec, "element codec must not be null"), networkCodec));
 
         return new DatapackRegistry<>() {
