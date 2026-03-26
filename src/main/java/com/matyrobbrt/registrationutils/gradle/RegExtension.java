@@ -395,11 +395,10 @@ public class RegExtension {
                 .forEach(File::delete);
     }
 
-    public static class JarTask extends Jar {
-        @Override
-        public void copy() {
-            super.copy();
-        }
-
-    }
+//    public static class JarTask extends Jar { //Seemed unused? Required a plethora of methods to be implemented now.
+//        @Override
+//        public void copy() {
+//            super.copy();
+//        }
+//    }
 }

@@ -38,6 +38,7 @@ import net.minecraft.core.*;
 import net.minecraft.data.DataProvider;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.RegistryDataLoader;
+import net.minecraft.resources.RegistryValidator;
 import net.minecraft.resources.ResourceKey;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -130,14 +131,14 @@ public class FabricDatapackRegistryBuilder<T> implements DatapackRegistryBuilder
             try {
                 final List<RegistryDataLoader.RegistryData<?>> mutableCopy = new ArrayList<>(RegistryDataLoader.WORLDGEN_REGISTRIES);
                 mutableCopy.add(new RegistryDataLoader.RegistryData<>(
-                        key, elementCodec, false
+                        key, elementCodec, RegistryValidator.none()
                 ));
                 UNSAFE.putObject(RegistryDataLoader.class, offset$WORLDGEN_REGISTRIES, List.copyOf(mutableCopy));
 
                 if (networkCodec != null) {
                     final List<RegistryDataLoader.RegistryData<?>> mutableNetwork = new ArrayList<>(RegistryDataLoader.SYNCHRONIZED_REGISTRIES);
                     mutableNetwork.add(new RegistryDataLoader.RegistryData<>(
-                            key, networkCodec, false
+                            key, networkCodec, RegistryValidator.none()
                     ));
                     UNSAFE.putObject(RegistryDataLoader.class, offset$SYNCHRONIZED_REGISTRIES, List.copyOf(mutableNetwork));
 
