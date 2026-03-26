@@ -1,7 +1,7 @@
 plugins {
-    id 'fabric-loom' version '1.13.3'
     id 'maven-publish'
     id 'idea'
+    id 'net.fabricmc.fabric-loom'
 }
 
 loom {
@@ -12,21 +12,16 @@ loom {
 
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
-    mappings loom.officialMojangMappings()
 
-    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
-    modImplementation(platform("net.fabricmc.fabric-api:fabric-api-bom:${fabric_version}"))
-    modImplementation('net.fabricmc.fabric-api:fabric-command-api-v2')
-    modImplementation('net.fabricmc.fabric-api:fabric-registry-sync-v0')
+    implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    implementation('net.fabricmc.fabric-api:fabric-command-api-v2')
+    implementation('net.fabricmc.fabric-api:fabric-registry-sync-v0')
 
-    implementation group: 'com.google.code.findbugs', name: 'jsr305', version: '3.0.1'
+    implementation "com.google.code.findbugs:jsr305:3.0.1"
     compileOnly 'com.google.auto.service:auto-service:1.0.1'
     annotationProcessor 'com.google.auto.service:auto-service:1.0.1'
     implementation project(":Common")
-}
-
-processResources {
-    from project(":Common").sourceSets.main.resources
 }
 
 jar {
