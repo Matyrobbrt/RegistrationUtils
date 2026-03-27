@@ -167,7 +167,7 @@ Map<?, ?> makeAttributes() {
 		'Implementation-Title'    : project.name,
 		'Implementation-Version'  : "${project.version}",
 		'Implementation-Vendor'   : 'Matyrobbrt',
-		'Implementation-Timestamp': currentDateTime,
+		'Implementation-Timestamp': "${currentDateTime}",
 		'Built-On-Java'           : "${System.getProperty('java.vm.version')} (${System.getProperty('java.vm.vendor')})",
 	]
 }
