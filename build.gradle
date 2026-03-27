@@ -4,27 +4,23 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
-buildscript {
-	dependencies {
-		classpath 'org.codehaus.groovy:groovy-all:3.0.9'
-		classpath 'org.ow2.asm:asm:9.7'
-	}
-}
-
 plugins {
 	id 'java-gradle-plugin'
 	id 'maven-publish'
 	id 'com.gradle.plugin-publish' version '1.2.1'
 	id 'idea'
 	id 'com.github.johnrengelman.shadow' version '8.1.1'
-	id 'org.cadixdev.licenser' version '0.6.1' apply false
+	id 'net.neoforged.licenser' version '0.7.5' apply false
 	// Required for NeoGradle
 	id "org.jetbrains.gradle.plugin.idea-ext" version "1.1.8"
+
+	id 'net.fabricmc.fabric-loom' version '1.15-SNAPSHOT' apply false
+    id 'net.neoforged.moddev' version '2.0.141' apply false
 }
 
 subprojects {
 	apply plugin: 'java'
-	java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+	java.toolchain.languageVersion = JavaLanguageVersion.of(java_version)
 }
 
 if (System.getenv('GPP_KEY')) {
@@ -53,10 +49,10 @@ repositories {
 }
 
 dependencies {
-	shade 'org.ow2.asm:asm:9.7'
-	shade 'org.ow2.asm:asm-tree:9.7'
-	shade 'me.lucko:jar-relocator:1.5'
-	shade 'commons-io:commons-io:2.13.0'
+	shade 'org.ow2.asm:asm:9.8'
+	shade 'org.ow2.asm:asm-tree:9.8'
+	shade 'me.lucko:jar-relocator:1.7'
+	shade 'commons-io:commons-io:2.21.0'
 
 	implementation 'org.jetbrains.gradle.plugin.idea-ext:org.jetbrains.gradle.plugin.idea-ext.gradle.plugin:1.1.8'
 
@@ -152,8 +148,8 @@ tasks.named('shadowJar', ShadowJar).configure {
 	archiveClassifier.set('')
 	configurations = [project.configurations.shade]
 	manifest.attributes(makeAttributes())
-	enableRelocation true
-	relocationPrefix("com.matyrobbrt.registrationutils.gradle.shade")
+	enableRelocation = true
+	relocationPrefix = "com.matyrobbrt.registrationutils.gradle.shade"
 }
 
 jar {
@@ -164,11 +160,11 @@ Map<?, ?> makeAttributes() {
 	final var actualDateTime = OffsetDateTime.now(ZoneOffset.UTC).withNano(0)
 	final var currentDateTime = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(actualDateTime)
 	return [
-		'Maven-Artifact'          : "${project.group}:${archivesBaseName}:${project.version}",
-		'Specification-Title'     : archivesBaseName,
+		'Maven-Artifact'          : "${project.group}:${project.name}:${project.version}",
+		'Specification-Title'     : project.name,
 		'Specification-Vendor'    : 'Matyrobbrt',
 		'Specification-Version'   : '1',
-		'Implementation-Title'    : archivesBaseName,
+		'Implementation-Title'    : project.name,
 		'Implementation-Version'  : "${project.version}",
 		'Implementation-Vendor'   : 'Matyrobbrt',
 		'Implementation-Timestamp': currentDateTime,
@@ -177,11 +173,19 @@ Map<?, ?> makeAttributes() {
 }
 
 allprojects {
-	apply plugin: 'org.cadixdev.licenser'
+	apply plugin: 'net.neoforged.licenser'
 	license {
 		header = rootProject.file('licenseheader.txt')
 	}
 	repositories {
 		mavenCentral()
 	}
+
+    configurations.all { //Pull specific asm versions, to make sure dependencies are not pulling old versions
+        resolutionStrategy {
+            force 'org.ow2.asm:asm:9.8'
+            force 'org.ow2.asm:asm-tree:9.8'
+            force 'org.ow2.asm:asm-commons:9.8'
+        }
+    }
 }

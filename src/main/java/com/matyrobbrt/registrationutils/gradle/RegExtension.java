@@ -394,12 +394,4 @@ public class RegExtension {
                 .map(Path::toFile)
                 .forEach(File::delete);
     }
-
-    public static class JarTask extends Jar {
-        @Override
-        public void copy() {
-            super.copy();
-        }
-
-    }
 }
