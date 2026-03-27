@@ -9,7 +9,7 @@ plugins {
 	id 'maven-publish'
 	id 'com.gradle.plugin-publish' version '1.2.1'
 	id 'idea'
-	id 'com.github.johnrengelman.shadow' version '8.1.1'
+	id 'com.gradleup.shadow' version '9.4.1'
 	id 'net.neoforged.licenser' version '0.7.5' apply false
 	// Required for NeoGradle
 	id "org.jetbrains.gradle.plugin.idea-ext" version "1.1.8"
@@ -148,7 +148,7 @@ tasks.named('shadowJar', ShadowJar).configure {
 	archiveClassifier.set('')
 	configurations = [project.configurations.shade]
 	manifest.attributes(makeAttributes())
-	enableRelocation = true
+	enableAutoRelocation = true
 	relocationPrefix = "com.matyrobbrt.registrationutils.gradle.shade"
 }
 
